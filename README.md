@@ -15,9 +15,8 @@ MACHINE=raven-frdm-imx95 DISTRO=raven EULA=0 SDKMACHINE=x86_64 \
 ```
 
 The manifest creates the setup symlink. Use the single active `build` folder.
-Setup follows NXP's existing
-`setup-environment`, configuration backups and `hook_in_layer` flow. Choose a
-separate `-b` folder for each board. To re-enter the configured environment:
+Setup follows NXP's `setup-environment`, configuration backups and
+`hook_in_layer` flow. To re-enter the configured environment:
 
 ```sh
 source ./setup-environment build
