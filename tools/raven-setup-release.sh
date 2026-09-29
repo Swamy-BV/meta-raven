@@ -59,7 +59,7 @@ DISTRO = "$raven_distro"
 SDKMACHINE = "x86_64"
 ACCEPT_FSL_EULA = "$raven_eula"
 EOF
-    "${REPO:-$HOME/bin/repo}" manifest -r -o "$PWD/resolved-manifest.xml" || return 1
+    (cd "$raven_workspace" && "${REPO:-$HOME/bin/repo}" manifest -r -o "$raven_build_dir/resolved-manifest.xml") || return 1
     echo "Raven setup complete: MACHINE=$raven_machine DISTRO=$raven_distro"
     echo "Build directory: $PWD. No compilation started."
 }
