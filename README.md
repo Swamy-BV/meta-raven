@@ -1,43 +1,29 @@
 # meta-raven
 
-Raven Yocto metadata based on NXP BSP 6.18.37-2.1.0, Wrynose and ROS 2 Jazzy.
-The repository follows meta-imx's separation of board support and distro/images:
+Raven board support and ROS 2 image metadata for NXP BSP 6.18.37-2.1.0 / Wrynose.
 
-| Layer | Contents |
-| --- | --- |
-| meta-raven-bsp | Machine configurations and board-specific firmware/kernel integration |
-| meta-raven-sdk | Shared Raven distro, ROS image and setup templates |
-
-The shared `raven.xml` pins the NXP and ROS sources. Only meta-raven follows
-develop. Boards are selected by MACHINE; each defaults to its own build folder.
+- `meta-raven-bsp`: Raven machine configurations, including FRDM-IMX95.
+- `meta-raven-sdk`: shared distro and ROS 2 Jazzy image recipe.
+- `tools/raven-setup-release.sh`: NXP Robotics Edge setup script adapted for these layers.
 
 ```sh
-mkdir raven-workspace
-cd raven-workspace
 repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
 repo sync -c -j8 --no-tags
-MACHINE=raven-frdm-imx95 DISTRO=raven source ./raven-setup-release.sh
+MACHINE=raven-frdm-imx95 DISTRO=raven EULA=0 SDKMACHINE=x86_64 \
+    source ./raven-setup-release.sh -b build-frdm -r jazzy
 ```
 
-Setup creates configuration only. It leaves ACCEPT_FSL_EULA=0 unless you
-explicitly supply ACCEPT_FSL_EULA=1 after reading sources/meta-imx/LICENSE.txt.
-Run setup again with the same selections to re-enter an existing build folder.
-Use -b to choose a different folder and -r jazzy to select the supported ROS distro. Keep separate folders for different boards
-and distros; downloads and sstate-cache are shared by default.
+The manifest creates the setup symlink. Setup follows NXP's existing
+`setup-environment`, configuration backups and `hook_in_layer` flow. Choose a
+separate `-b` folder for each board. To re-enter the configured environment:
 
-The current Raven machine inherits NXP's FRDM-IMX95 configuration. A future
-custom board gets its own machine file, sharing SoC includes where appropriate.
-Place board-specific modifications in machine-scoped recipe appends/files.
-The BSP layer does not depend on ROS; the SDK layer supplies the ROS image.
+```sh
+source ./setup-environment build-frdm
+```
 
-`raven-image-ros` includes ROS base, C++ talker/listener demos and SSH without a
-desktop. Compile only when desired with `bitbake raven-image-ros` after license
-acceptance. Boot firmware and peripheral ownership still use stock FRDM
-settings; Raven SM, PX4 loading and shared memory integration remain separate
-bring-up work. No scripts automatically compile or flash the board.
+`EULA=0` leaves the NXP license unaccepted. Read `sources/meta-imx/LICENSE.txt`
+before accepting it. Setup does not compile. When requested and after license
+acceptance, the image target is `bitbake raven-image-ros`.
 
-The setup script was copied unchanged from NXP meta-robotics-edge v1.0.0 in
-a dedicated commit, then adapted separately for Raven. NXP's source-script
-interface and build/ROS options are retained. The adaptation uses Wrynose's
-openembedded-core and Raven templates instead of the older Robotics Edge
-Poky layout and unrelated industrial/Matter/desktop layers.
+The machine retains stock FRDM boot firmware and peripheral ownership. Raven
+SM/PX4 packaging and shared-memory integration remain separate bring-up work.
