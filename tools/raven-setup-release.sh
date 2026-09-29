@@ -29,7 +29,7 @@ echo "
 echo -e "\n
     Supported machines: "raven-frdm-imx95, imx95-15x15-lpddr4x-frdm, imx95-19x19-lpddr5-evk"
 
-    Supported NXP's robotics-edge distros: `echo; ls sources/meta-raven/meta-raven-sdk/conf/distro/*.conf \
+    Supported NXP's robotics-edge distros: `echo; ls sources/meta-raven/conf/distro/*.conf \
         | sed s/\.conf//g | sed -r 's/^.+\///' | xargs -I% echo -e "\t%"`
 "
 }
@@ -101,7 +101,7 @@ if [ -z "$ROS2_DISTRO" ]; then
 fi
 
 if [ "$ROS2_DISTRO" != "jazzy" ]; then
-    echo "Only jazzy is configured in the Raven SDK layer."
+    echo "Only jazzy is configured in the Raven layer."
     cleanup
     return 1
 fi
@@ -176,9 +176,8 @@ echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros-common\"" >> $BUILD_DI
 
 echo "ROS_DISTRO = \"$ROS2_DISTRO\"" >> $BUILD_DIR/conf/local.conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros2-jazzy\"" >> $BUILD_DIR/conf/bblayers.conf
-echo -e "\n# Raven BSP and SDK layers" >> $BUILD_DIR/conf/bblayers.conf
-hook_in_layer meta-raven/meta-raven-bsp
-hook_in_layer meta-raven/meta-raven-sdk
+echo -e "\n# Raven layer" >> $BUILD_DIR/conf/bblayers.conf
+hook_in_layer meta-raven
 
 cd  $BUILD_DIR
 cleanup

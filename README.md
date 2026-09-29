@@ -2,9 +2,10 @@
 
 Raven board support and ROS 2 image metadata for NXP BSP 6.18.37-2.1.0 / Wrynose.
 
-- `meta-raven-bsp`: Raven machine configurations, including FRDM-IMX95.
-- `meta-raven-sdk`: shared distro and ROS 2 Jazzy image recipe.
-- `tools/raven-setup-release.sh`: NXP Robotics Edge setup script adapted for these layers.
+- `conf/machine`: Raven machine configurations, including FRDM-IMX95.
+- `conf/distro`: shared Raven distro.
+- `recipes-core/images`: ROS 2 Jazzy image recipe.
+- `tools/raven-setup-release.sh`: NXP Robotics Edge setup script adapted for this single layer.
 
 ```sh
 repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
