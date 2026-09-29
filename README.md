@@ -1,25 +1,37 @@
 # meta-raven
 
-Raven Yocto layer and build entry point for FRDM-IMX95 development. NXP BSP 6.18.37-2.1.0,
-Yocto Wrynose, ROS 2 Jazzy. Use a Linux filesystem for the workspace.
+Raven Yocto metadata based on NXP BSP 6.18.37-2.1.0, Wrynose and ROS 2 Jazzy.
+The repository follows meta-imx's separation of board support and distro/images:
+
+| Layer | Contents |
+| --- | --- |
+| meta-raven-bsp | Machine configurations and board-specific firmware/kernel integration |
+| meta-raven-sdk | Shared Raven distro, ROS image and setup templates |
+
+The shared `raven.xml` pins the NXP and ROS sources. Only meta-raven follows
+develop. Boards are selected by MACHINE; each defaults to its own build folder.
 
 ```sh
-git clone -b develop https://github.com/Swamy-BV/meta-raven.git
-./meta-raven/scripts/sync.sh /home/dev/raven/linux
-./meta-raven/scripts/setup.sh /home/dev/raven/linux
-# Build only when desired; read sources/meta-imx/LICENSE.txt before accepting.
-ACCEPT_FSL_EULA=1 ./meta-raven/scripts/build.sh /home/dev/raven/linux
+mkdir raven-workspace
+cd raven-workspace
+repo init -u https://github.com/Swamy-BV/imx-manifest.git -b develop -m raven.xml
+repo sync -c -j8 --no-tags
+MACHINE=raven-frdm-imx95 DISTRO=raven source ./raven-setup-release.sh
 ```
 
-This layer pins the manifest commit in `release.env`. `raven.xml` contains all pinned NXP release projects and meta-ros, and follows
-only meta-raven's develop branch. It is shared across boards; board selection
-belongs in meta-raven machine configurations. Setup alone leaves the NXP
-license unaccepted and does not invoke a build. Each build writes `resolved-manifest.xml` to
-record the exact revisions; use that file for a reproducible release.
+Setup creates configuration only. It leaves ACCEPT_FSL_EULA=0 unless you
+explicitly supply ACCEPT_FSL_EULA=1 after reading sources/meta-imx/LICENSE.txt.
+Run setup again with the same selections to re-enter an existing build folder.
+Use -b to choose a different folder. Keep separate folders for different boards
+and distros; downloads and sstate-cache are shared by default.
 
-Image: `raven-image-ros`; machine: `raven-frdm-imx95`.
-The image includes ROS base, C++ talker/listener demos and SSH, without a
-desktop. NXP's development configuration allows an empty root password.
-Boot firmware and peripheral ownership still use the stock FRDM baseline.
-Raven SM, PX4 loading and shared memory are not integrated in this image yet.
-Compiling this image does not flash the board.
+The current Raven machine inherits NXP's FRDM-IMX95 configuration. A future
+custom board gets its own machine file, sharing SoC includes where appropriate.
+Place board-specific modifications in machine-scoped recipe appends/files.
+The BSP layer does not depend on ROS; the SDK layer supplies the ROS image.
+
+`raven-image-ros` includes ROS base, C++ talker/listener demos and SSH without a
+desktop. Compile only when desired with `bitbake raven-image-ros` after license
+acceptance. Boot firmware and peripheral ownership still use stock FRDM
+settings; Raven SM, PX4 loading and shared memory integration remain separate
+bring-up work. No scripts automatically compile or flash the board.

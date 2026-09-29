@@ -1,0 +1,8 @@
+# Hardware and distro are selected by raven-setup-release.sh.
+require conf/raven.conf
+PACKAGE_CLASSES = "package_deb"
+DL_DIR ?= "${BSPDIR}/downloads"
+SSTATE_DIR ?= "${BSPDIR}/sstate-cache"
+BB_NUMBER_THREADS ?= "8"
+PARALLEL_MAKE ?= "-j 8"
+CONF_VERSION = "2"

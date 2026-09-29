@@ -1,4 +1,4 @@
-SUMMARY = "Raven FRDM development image with ROS 2 Jazzy"
+SUMMARY = "Raven development image with ROS 2 Jazzy"
 LICENSE = "MIT"
 
 require recipes-core/images/core-image-minimal.bb
