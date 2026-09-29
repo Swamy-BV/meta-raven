@@ -105,6 +105,11 @@ if [ "$ROS2_DISTRO" != "jazzy" ]; then
     cleanup
     return 1
 fi
+RAVEN_EULA=${EULA:-1}
+case "$RAVEN_EULA" in
+    0|1) EULA=$RAVEN_EULA ;;
+    *) echo "EULA must be 0 or 1"; return 1 ;;
+esac
 # Override the click-through in meta-freescale
 FSL_EULA_FILE=$CWD/sources/meta-imx/LICENSE.txt
 
@@ -127,6 +132,10 @@ if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
 else
     cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
 fi
+
+# NXP restores local.conf.org on each setup. Apply the requested choice again.
+sed -i '/^ACCEPT_FSL_EULA[[:space:]]*=/d' $BUILD_DIR/conf/local.conf
+echo "ACCEPT_FSL_EULA = \"$RAVEN_EULA\"" >> $BUILD_DIR/conf/local.conf
 
 echo >> $BUILD_DIR/conf/local.conf
 echo "# Share cache" >> $BUILD_DIR/conf/local.conf
