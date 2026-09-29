@@ -22,7 +22,7 @@ MACHINE=raven-frdm-imx95 DISTRO=raven source ./raven-setup-release.sh
 Setup creates configuration only. It leaves ACCEPT_FSL_EULA=0 unless you
 explicitly supply ACCEPT_FSL_EULA=1 after reading sources/meta-imx/LICENSE.txt.
 Run setup again with the same selections to re-enter an existing build folder.
-Use -b to choose a different folder. Keep separate folders for different boards
+Use -b to choose a different folder and -r jazzy to select the supported ROS distro. Keep separate folders for different boards
 and distros; downloads and sstate-cache are shared by default.
 
 The current Raven machine inherits NXP's FRDM-IMX95 configuration. A future
@@ -35,3 +35,9 @@ desktop. Compile only when desired with `bitbake raven-image-ros` after license
 acceptance. Boot firmware and peripheral ownership still use stock FRDM
 settings; Raven SM, PX4 loading and shared memory integration remain separate
 bring-up work. No scripts automatically compile or flash the board.
+
+The setup script was copied unchanged from NXP meta-robotics-edge v1.0.0 in
+a dedicated commit, then adapted separately for Raven. NXP's source-script
+interface and build/ROS options are retained. The adaptation uses Wrynose's
+openembedded-core and Raven templates instead of the older Robotics Edge
+Poky layout and unrelated industrial/Matter/desktop layers.
