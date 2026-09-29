@@ -14,7 +14,7 @@ develop. Boards are selected by MACHINE; each defaults to its own build folder.
 ```sh
 mkdir raven-workspace
 cd raven-workspace
-repo init -u https://github.com/Swamy-BV/imx-manifest.git -b develop -m raven.xml
+repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
 repo sync -c -j8 --no-tags
 MACHINE=raven-frdm-imx95 DISTRO=raven source ./raven-setup-release.sh
 ```
