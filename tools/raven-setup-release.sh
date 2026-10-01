@@ -120,7 +120,16 @@ esac
 FSL_EULA_FILE=$CWD/sources/meta-imx/LICENSE.txt
 
 # Set up the basic yocto environment
-DISTRO=$FSLDISTRO MACHINE=$MACHINE . ./$PROGNAME "$BUILD_DIR" || return 1
+RAVEN_SETUP_OUTPUT=$(mktemp) || return 1
+if DISTRO=$FSLDISTRO MACHINE=$MACHINE . ./$PROGNAME "$BUILD_DIR" > "$RAVEN_SETUP_OUTPUT"; then
+    # NXP's fixed target list does not include Raven recipes.
+    sed '/^Welcome to Freescale Community BSP$/,/^    meta-ide-support$/d' "$RAVEN_SETUP_OUTPUT"
+    rm -f "$RAVEN_SETUP_OUTPUT"
+else
+    cat "$RAVEN_SETUP_OUTPUT"
+    rm -f "$RAVEN_SETUP_OUTPUT"
+    return 1
+fi
 
 # Point to the current directory since the last command changed the directory to $BUILD_DIR
 BUILD_DIR=.
