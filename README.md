@@ -31,7 +31,7 @@ the A/B rootfs, kernel, and FRDM DTB staging bundle with
 Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
 WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
 
-The FRDM U-Boot append builds redundant environments at 0x700000 and
+The U-Boot append builds redundant environments at 0x700000 and
 0x704000, selects boot/rootfs A or B with `bootslot`, and rolls back after
 three unconfirmed boots when `upgrade_available=1`. The SWU does not change
 `bootslot` or flash `imx-boot` yet: first verify the target boot medium and

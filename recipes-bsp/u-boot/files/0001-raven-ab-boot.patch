@@ -1,5 +1,5 @@
 From: Raven Project <raven@local>
-Subject: [PATCH] imx95 FRDM: enable redundant environment and A/B boot selection
+Subject: [PATCH] imx95: configure Raven A/B boot and redundant environment
 Upstream-Status: Inappropriate [Raven partition layout]
 
 diff --git a/board/nxp/imx95_frdm/imx95_frdm.env b/board/nxp/imx95_frdm/imx95_frdm.env
