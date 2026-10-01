@@ -155,6 +155,7 @@ echo "ACCEPT_FSL_EULA = \"$RAVEN_EULA\"" >> $BUILD_DIR/conf/local.conf
 echo >> $BUILD_DIR/conf/local.conf
 echo "# Share cache" >> $BUILD_DIR/conf/local.conf
 echo "SSTATE_DIR ?= \"\${BSPDIR}/sstate-cache\"" >> $BUILD_DIR/conf/local.conf
+echo "BB_HASHSERVE_DB_DIR = \"\${SSTATE_DIR}\"" >> $BUILD_DIR/conf/local.conf
 
 echo >> conf/local.conf
 echo "# Switch to Debian packaging and include package-management in the image" >> conf/local.conf
