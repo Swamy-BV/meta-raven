@@ -8,3 +8,6 @@ inherit ros_distro_jazzy ros2_image
 IMAGE_FEATURES:remove = "splash"
 IMAGE_FEATURES += "ssh-server-openssh"
 IMAGE_INSTALL:append = " ros-base demo-nodes-cpp iproute2 ethtool swupdate"
+
+# The SWU bundle consumes this standalone filesystem image, not the factory WIC.
+IMAGE_FSTYPES:append = " ext4.gz"

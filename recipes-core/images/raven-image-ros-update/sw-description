@@ -1,0 +1,29 @@
+software = {
+    version = "@@PV@@";
+    description = "Raven ROS rootfs staging bundle; boot activation is separate";
+
+    stable = {
+        slot_a = {
+            images: (
+                {
+                    filename = "raven-image-ros-jazzy-raven-frdm-imx95.rootfs.ext4.gz";
+                    type = "raw";
+                    compressed = "zlib";
+                    device = "/dev/disk/by-partlabel/rootfs_a";
+                    sha256 = "$swupdate_get_sha256(raven-image-ros-jazzy-raven-frdm-imx95.rootfs.ext4.gz)";
+                }
+            );
+        };
+        slot_b = {
+            images: (
+                {
+                    filename = "raven-image-ros-jazzy-raven-frdm-imx95.rootfs.ext4.gz";
+                    type = "raw";
+                    compressed = "zlib";
+                    device = "/dev/disk/by-partlabel/rootfs_b";
+                    sha256 = "$swupdate_get_sha256(raven-image-ros-jazzy-raven-frdm-imx95.rootfs.ext4.gz)";
+                }
+            );
+        };
+    };
+}
