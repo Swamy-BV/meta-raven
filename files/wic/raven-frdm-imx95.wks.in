@@ -1,0 +1,22 @@
+# Raven FRDM-IMX95 factory image. Sizes are MiB.
+# Preserve the NXP raw imx-boot placement and the 8 MiB area containing
+# U-Boot's current environment at 7 MiB. This WIC is for factory flashing;
+# a SWUpdate package must write only inactive slots, not the whole disk.
+
+part u-boot --source rawcopy --sourceparams="file=imx-boot.tagged" --ondisk mmcblk --no-table --align ${IMX_BOOT_SEEK}
+
+# Both slots start with the same kernel, device trees, M7 demos, and rootfs.
+# Keep boot_a at p1 and rootfs_a at p2 so NXP's initial U-Boot defaults boot A.
+# Boot selection and rollback for slot B require separate U-Boot changes.
+part /boot --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_a --part-name boot_a --active --align 8192 --fixed-size 512
+part / --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_a --part-name rootfs_a --align 8192 --fixed-size 4096
+part --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_b --part-name boot_b --align 8192 --fixed-size 512
+part --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_b --part-name rootfs_b --align 8192 --fixed-size 4096
+
+# Per-slot application data allows an old slot to retain its own data on rollback.
+# The single overlay partition can hold separate upper/work directories per slot.
+part --ondisk mmcblk --fstype=ext4 --label data_a --part-name data_a --align 8192 --fixed-size 4096
+part --ondisk mmcblk --fstype=ext4 --label data_b --part-name data_b --align 8192 --fixed-size 4096
+part --ondisk mmcblk --fstype=ext4 --label overlay --part-name overlay --align 8192 --fixed-size 512
+
+bootloader --ptable ${IMX_BOOTLOADER_PTABLE}
