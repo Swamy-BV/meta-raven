@@ -28,6 +28,8 @@ to decline it. The license text is at `sources/meta-imx/LICENSE.txt`.
 Setup does not compile. Build the Linux image with `bitbake raven-image` and
 the A/B rootfs, kernel, and FRDM DTB staging bundle with
 `bitbake raven-image-swu`.
+The image build also compiles the pinned Raven System Manager source with the
+`raven_frdm_drone` partition and packs it into `imx-boot`.
 Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
 WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
 
@@ -41,5 +43,5 @@ The current SWU selects partitions by label, so verify those labels resolve
 to the booted disk before use, especially if SD and eMMC contain identical
 Raven images.
 
-The machine retains stock FRDM peripheral ownership. Raven
-SM/PX4 packaging and shared-memory integration remain separate bring-up work.
+The Raven SM partition defines peripheral ownership. PX4 packaging and
+shared-memory integration remain separate bring-up work.
