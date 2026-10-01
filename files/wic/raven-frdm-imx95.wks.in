@@ -13,10 +13,12 @@ part / --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_a --part-nam
 part --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_b --part-name boot_b --align 8192 --fixed-size 512
 part --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_b --part-name rootfs_b --align 8192 --fixed-size 4096
 
-# Per-slot application data allows an old slot to retain its own data on rollback.
-# The single overlay partition can hold separate upper/work directories per slot.
-part --ondisk mmcblk --fstype=ext4 --label data_a --part-name data_a --align 8192 --fixed-size 4096
-part --ondisk mmcblk --fstype=ext4 --label data_b --part-name data_b --align 8192 --fixed-size 4096
+# Shared data survives A/B image replacement. Keep format changes compatible
+# with the old slot so rollback can still read it.
+part --ondisk mmcblk --fstype=ext4 --label data --part-name data --align 8192 --fixed-size 4096
+# Keep separate upper/work directories for A and B on the single overlay volume.
 part --ondisk mmcblk --fstype=ext4 --label overlay --part-name overlay --align 8192 --fixed-size 512
+# Small shared store for identity, calibration, and other critical settings.
+part --ondisk mmcblk --fstype=ext4 --label persistent --part-name persistent --align 8192 --fixed-size 32
 
 bootloader --ptable ${IMX_BOOTLOADER_PTABLE}
