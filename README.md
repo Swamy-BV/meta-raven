@@ -10,11 +10,12 @@ Raven board support and ROS 2 image metadata for NXP BSP 6.18.37-2.1.0 / Wrynose
 ```sh
 repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
 repo sync -c -j8 --no-tags
-MACHINE=raven-frdm-imx95 DISTRO=raven SDKMACHINE=x86_64 \
-    source ./raven-setup-release.sh -b build -r jazzy
+source ./raven-setup-release.sh -b build -r jazzy
 ```
 
-The manifest creates the setup symlink. Use the single active `build` folder.
+The manifest creates the setup symlink. The script defaults to
+`MACHINE=raven-frdm-imx95`, `DISTRO=raven`, and `SDKMACHINE=x86_64`.
+Use the single active `build` folder.
 Setup follows NXP's `setup-environment`, configuration backups and
 `hook_in_layer` flow. To re-enter the configured environment:
 

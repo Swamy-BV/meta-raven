@@ -95,6 +95,12 @@ if [ -z "$MACHINE" ]; then
     MACHINE='raven-frdm-imx95'
 fi
 
+if [ -z "$SDKMACHINE" ]; then
+    echo setting to default SDK machine
+    SDKMACHINE='x86_64'
+fi
+RAVEN_SDKMACHINE=$SDKMACHINE
+
 if [ -z "$ROS2_DISTRO" ]; then
     echo setting to default ROS2 distro
     ROS2_DISTRO='jazzy'
@@ -185,6 +191,7 @@ echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros2\"" >> $BUILD_DIR/conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros-common\"" >> $BUILD_DIR/conf/bblayers.conf
 
 echo "ROS_DISTRO = \"$ROS2_DISTRO\"" >> $BUILD_DIR/conf/local.conf
+echo "SDKMACHINE = \"$RAVEN_SDKMACHINE\"" >> $BUILD_DIR/conf/local.conf
 echo "BB_NUMBER_THREADS = \"4\"" >> $BUILD_DIR/conf/local.conf
 echo "PARALLEL_MAKE = \"-j 2\"" >> $BUILD_DIR/conf/local.conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros2-jazzy\"" >> $BUILD_DIR/conf/bblayers.conf
