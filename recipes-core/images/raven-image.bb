@@ -4,6 +4,9 @@ LICENSE = "MIT"
 require recipes-core/images/core-image-base.bb
 inherit ros_distro_jazzy ros2_image
 
+# Raven has one default ROS distribution; keep artifact names board-oriented.
+ROS_IMAGE_BASENAME_APPEND = ""
+
 # Console image: retain hardware support, but no splash screen or desktop.
 IMAGE_FEATURES:remove = "splash"
 IMAGE_FEATURES += "ssh-server-openssh"

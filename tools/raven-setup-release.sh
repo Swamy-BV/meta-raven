@@ -199,4 +199,5 @@ hook_in_layer meta-raven
 cd  $BUILD_DIR
 cleanup
 exit_message
-echo "Raven image target: bitbake raven-image-ros"
+echo "Raven image target: bitbake raven-image"
+echo "Raven update target: bitbake raven-image-swu"

@@ -25,7 +25,8 @@ source ./setup-environment build
 
 The setup script defaults to `EULA=1`, accepting NXP's license. Set `EULA=0`
 to decline it. The license text is at `sources/meta-imx/LICENSE.txt`.
-Setup does not compile. The image target is `bitbake raven-image-ros`.
+Setup does not compile. Build the Linux image with `bitbake raven-image` and
+the rootfs SWUpdate bundle with `bitbake raven-image-swu`.
 Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
 WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
 
