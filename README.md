@@ -25,6 +25,8 @@ source ./setup-environment build
 The setup script defaults to `EULA=1`, accepting NXP's license. Set `EULA=0`
 to decline it. The license text is at `sources/meta-imx/LICENSE.txt`.
 Setup does not compile. The image target is `bitbake raven-image-ros`.
+Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
+WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
 
 The machine retains stock FRDM boot firmware and peripheral ownership. Raven
 SM/PX4 packaging and shared-memory integration remain separate bring-up work.

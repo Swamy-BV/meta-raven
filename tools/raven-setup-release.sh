@@ -185,6 +185,8 @@ echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros2\"" >> $BUILD_DIR/conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros-common\"" >> $BUILD_DIR/conf/bblayers.conf
 
 echo "ROS_DISTRO = \"$ROS2_DISTRO\"" >> $BUILD_DIR/conf/local.conf
+echo "BB_NUMBER_THREADS = \"4\"" >> $BUILD_DIR/conf/local.conf
+echo "PARALLEL_MAKE = \"-j 2\"" >> $BUILD_DIR/conf/local.conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-ros/meta-ros2-jazzy\"" >> $BUILD_DIR/conf/bblayers.conf
 echo -e "\n# Raven layer" >> $BUILD_DIR/conf/bblayers.conf
 hook_in_layer meta-raven
