@@ -1,0 +1,69 @@
+From: Raven Project <raven@local>
+Subject: [PATCH] imx95 FRDM: enable redundant environment and A/B boot selection
+Upstream-Status: Inappropriate [Raven partition layout]
+
+diff --git a/board/nxp/imx95_frdm/imx95_frdm.env b/board/nxp/imx95_frdm/imx95_frdm.env
+index 88a496e..f19ab4b 100644
+--- a/board/nxp/imx95_frdm/imx95_frdm.env
++++ b/board/nxp/imx95_frdm/imx95_frdm.env
+@@ -78,6 +78,12 @@ mmcdev=CONFIG_ENV_MMC_DEVICE_INDEX
+ mmcpart=1
+ mmcroot=/dev/mmcblk1p2 rootwait rw
+ mmcautodetect=yes
++bootslot=dualA
++adjustbootsource=if test ${bootslot} = dualB; then
++		setenv mmcpart 3; setenv mmcroot /dev/mmcblk${mmcdev}p4 rootwait rw;
++	else
++		setenv mmcpart 1; setenv mmcroot /dev/mmcblk${mmcdev}p2 rootwait rw;
++	fi
+ mmcargs=setenv bootargs ${jh_clk} ${mcore_args} console=${console} root=${mmcroot}
+ prepare_mcore=setenv mcore_args pd_ignore_unused;
+ loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};
+@@ -127,6 +133,7 @@ netboot=echo Booting from net ...;
+ 			fi;
+ 		fi;
+ bsp_bootcmd=echo Running BSP bootcmd ...;
++			run adjustbootsource;
+ 			mmc dev ${mmcdev}; if mmc rescan; then
+ 			if run loadbootscript; then
+ 				run bootscript;
+diff --git a/configs/imx95_15x15_frdm_defconfig b/configs/imx95_15x15_frdm_defconfig
+index 45a21fe..e30c8aa 100644
+--- a/configs/imx95_15x15_frdm_defconfig
++++ b/configs/imx95_15x15_frdm_defconfig
+@@ -11,6 +11,8 @@ CONFIG_ENV_SOURCE_FILE="imx95_frdm"
+ CONFIG_SF_DEFAULT_SPEED=40000000
+ CONFIG_ENV_SIZE=0x4000
+ CONFIG_ENV_OFFSET=0x700000
++CONFIG_ENV_REDUNDANT=y
++CONFIG_ENV_OFFSET_REDUND=0x704000
+ CONFIG_ENV_SECT_SIZE=0x10000
+ CONFIG_IMX_CONFIG="arch/arm/mach-imx/imx9/imximage.cfg"
+ CONFIG_DM_GPIO=y
+@@ -22,6 +24,8 @@ CONFIG_SYS_MONITOR_LEN=524288
+ CONFIG_SPL_MMC=y
+ CONFIG_SPL_SERIAL=y
+ CONFIG_SPL_DRIVERS_MISC=y
++CONFIG_BOOTCOUNT_BOOTLIMIT=3
++CONFIG_BOOTCOUNT_ALTBOOTCMD="if test ${bootslot} = dualB; then setenv bootslot dualA; else setenv bootslot dualB; fi; setenv upgrade_available 0; setenv bootcount 0; saveenv; run bootcmd"
+ CONFIG_SPL_HAVE_INIT_STACK=y
+ CONFIG_SPL_STACK=0x204d6000
+ CONFIG_SPL_TEXT_BASE=0x20480000
+@@ -38,7 +42,7 @@ CONFIG_REMAKE_ELF=y
+ CONFIG_FIT=y
+ CONFIG_FIT_VERBOSE=y
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_BOOTCOMMAND="run sr_ir_v2_cmd; bootflow scan -lb; run bsp_bootcmd"
++CONFIG_BOOTCOMMAND="run sr_ir_v2_cmd; run bsp_bootcmd"
+ CONFIG_DEFAULT_FDT_FILE="imx95-15x15-frdm.dtb"
+ CONFIG_SYS_CBSIZE=2048
+ CONFIG_SYS_PBSIZE=2074
+@@ -237,6 +241,8 @@ CONFIG_BMP_24BPP=y
+ CONFIG_BMP_32BPP=y
+ CONFIG_VIDEO_LOGO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_BOOTCOUNT_LIMIT=y
++CONFIG_BOOTCOUNT_ENV=y
+ CONFIG_SPLASH_SCREEN=y
+ CONFIG_SPLASH_SCREEN_ALIGN=y
+ CONFIG_CMD_BMP=y

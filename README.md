@@ -26,9 +26,20 @@ source ./setup-environment build
 The setup script defaults to `EULA=1`, accepting NXP's license. Set `EULA=0`
 to decline it. The license text is at `sources/meta-imx/LICENSE.txt`.
 Setup does not compile. Build the Linux image with `bitbake raven-image` and
-the rootfs SWUpdate bundle with `bitbake raven-image-swu`.
+the A/B rootfs, kernel, and FRDM DTB staging bundle with
+`bitbake raven-image-swu`.
 Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
 WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
 
-The machine retains stock FRDM boot firmware and peripheral ownership. Raven
+The FRDM U-Boot append builds redundant environments at 0x700000 and
+0x704000, selects boot/rootfs A or B with `bootslot`, and rolls back after
+three unconfirmed boots when `upgrade_available=1`. The SWU does not change
+`bootslot` or flash `imx-boot` yet: first verify the target boot medium and
+Linux device path, install the updated boot container through a recovery
+path, and configure `fw_env.config` and boot confirmation for the hardware.
+The current SWU selects partitions by label, so verify those labels resolve
+to the booted disk before use, especially if SD and eMMC contain identical
+Raven images.
+
+The machine retains stock FRDM peripheral ownership. Raven
 SM/PX4 packaging and shared-memory integration remain separate bring-up work.
