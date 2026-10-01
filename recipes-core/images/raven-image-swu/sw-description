@@ -1,9 +1,25 @@
 software = {
     version = "@@PV@@";
-    description = "Raven ROS rootfs staging bundle; boot activation is separate";
+    description = "Raven rootfs and boot-file staging bundle; boot activation is separate";
 
     stable = {
         slot_a = {
+            files: (
+                {
+                    filename = "Image";
+                    path = "/Image";
+                    device = "/dev/disk/by-partlabel/boot_a";
+                    filesystem = "vfat";
+                    sha256 = "$swupdate_get_sha256(Image)";
+                },
+                {
+                    filename = "imx95-15x15-frdm.dtb";
+                    path = "/imx95-15x15-frdm.dtb";
+                    device = "/dev/disk/by-partlabel/boot_a";
+                    filesystem = "vfat";
+                    sha256 = "$swupdate_get_sha256(imx95-15x15-frdm.dtb)";
+                }
+            );
             images: (
                 {
                     filename = "raven-image-raven-frdm-imx95.rootfs.ext4.gz";
@@ -15,6 +31,22 @@ software = {
             );
         };
         slot_b = {
+            files: (
+                {
+                    filename = "Image";
+                    path = "/Image";
+                    device = "/dev/disk/by-partlabel/boot_b";
+                    filesystem = "vfat";
+                    sha256 = "$swupdate_get_sha256(Image)";
+                },
+                {
+                    filename = "imx95-15x15-frdm.dtb";
+                    path = "/imx95-15x15-frdm.dtb";
+                    device = "/dev/disk/by-partlabel/boot_b";
+                    filesystem = "vfat";
+                    sha256 = "$swupdate_get_sha256(imx95-15x15-frdm.dtb)";
+                }
+            );
             images: (
                 {
                     filename = "raven-image-raven-frdm-imx95.rootfs.ext4.gz";
