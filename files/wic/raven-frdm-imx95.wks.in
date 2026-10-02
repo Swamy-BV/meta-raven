@@ -5,7 +5,8 @@
 
 part u-boot --source rawcopy --sourceparams="file=imx-boot.tagged" --ondisk mmcblk --no-table --align ${IMX_BOOT_SEEK}
 
-# Both slots start with the same kernel, device trees, M7 demos, and rootfs.
+# Both slots start with the same kernel, device trees, Raven PX4 M7 firmware,
+# and rootfs.
 # Keep boot_a at p1 and rootfs_a at p2 so NXP's initial U-Boot defaults boot A.
 # Boot selection and rollback for slot B require separate U-Boot changes.
 part /boot --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_a --part-name boot_a --active --align 8192 --fixed-size 512

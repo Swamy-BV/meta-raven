@@ -43,7 +43,9 @@ The current SWU selects partitions by label, so verify those labels resolve
 to the booted disk before use, especially if SD and eMMC contain identical
 Raven images.
 
-The Raven SM partition defines peripheral ownership. Build the FRDM M7 PX4
-firmware with `bitbake raven-px4-firmware`; its binary and ELF are deployed
-alongside the board images. Connecting that binary to `imx-boot` and SWUpdate,
-and validating shared memory on hardware, remain bring-up work.
+The Raven SM partition defines peripheral ownership. The factory `raven-image`
+builds FRDM M7 PX4 firmware, embeds its binary in `imx-boot`, and copies it to
+both boot partitions. `bitbake raven-px4-firmware` also builds the firmware
+alone and deploys its binary and debug ELF. The SWUpdate bundle does not replace
+`imx-boot` yet; boot-container updates and shared-memory validation on hardware
+remain bring-up work.
