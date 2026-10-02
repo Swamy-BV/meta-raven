@@ -1,51 +1,37 @@
 # meta-raven
 
-Raven board support and ROS 2 image metadata for NXP BSP 6.18.37-2.1.0 / Wrynose.
+Yocto layer for Raven on NXP i.MX95. The current development board is
+FRDM-IMX95; a separate machine configuration will be added for custom Raven
+hardware.
 
-- `conf/machine`: Raven machine configurations, including FRDM-IMX95.
-- `conf/distro`: shared Raven distro.
-- `recipes-core/images`: ROS 2 Jazzy image recipe.
-- `tools/raven-setup-release.sh`: NXP Robotics Edge setup script adapted for this single layer.
+## Status
+
+The `raven-image` build passes. It produces a console Linux image with ROS 2
+Jazzy, a Raven System Manager partition, PX4 M7 firmware in `imx-boot`, and
+an A/B eMMC layout. The image has **not yet been validated on hardware**.
+
+Track bring-up in GitHub issues:
+
+1. [Boot and validate the FRDM image](https://github.com/Swamy-BV/meta-raven/issues/1)
+2. [Bring up sensors and PX4 I/O](https://github.com/Swamy-BV/meta-raven/issues/2)
+3. [Validate updates and migrate to custom hardware](https://github.com/Swamy-BV/meta-raven/issues/3)
+
+## Build
 
 ```sh
 repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
 repo sync -c -j8 --no-tags
 source ./raven-setup-release.sh -b build -r jazzy
+bitbake raven-image
 ```
 
-The manifest creates the setup symlink. The script defaults to
-`MACHINE=raven-frdm-imx95`, `DISTRO=raven`, and `SDKMACHINE=x86_64`.
-Use the single active `build` folder.
-Setup follows NXP's `setup-environment`, configuration backups and
-`hook_in_layer` flow. To re-enter the configured environment:
+The manifest links the setup script from this layer. It defaults to
+`raven-frdm-imx95`, the `raven` distro, ROS 2 Jazzy, and the `build` directory.
+To return to the environment, run `source ./setup-environment build`.
+The script accepts NXP's EULA by default; set `EULA=0` to decline it.
 
-```sh
-source ./setup-environment build
-```
-
-The setup script defaults to `EULA=1`, accepting NXP's license. Set `EULA=0`
-to decline it. The license text is at `sources/meta-imx/LICENSE.txt`.
-Setup does not compile. Build the Linux image with `bitbake raven-image` and
-the A/B rootfs, kernel, and FRDM DTB staging bundle with
-`bitbake raven-image-swu`.
-The image build also compiles the pinned Raven System Manager source with the
-`raven_frdm_drone` partition and packs it into `imx-boot`.
-Setup also limits BitBake to four tasks and two compile jobs to fit the 30 GiB
-WSL build host. Adjust `build/conf/local.conf` after setup for a different host.
-
-The U-Boot append builds redundant environments at 0x700000 and
-0x704000, selects boot/rootfs A or B with `bootslot`, and rolls back after
-three unconfirmed boots when `upgrade_available=1`. The SWU does not change
-`bootslot` or flash `imx-boot` yet: first verify the target boot medium and
-Linux device path, install the updated boot container through a recovery
-path, and configure `fw_env.config` and boot confirmation for the hardware.
-The current SWU selects partitions by label, so verify those labels resolve
-to the booted disk before use, especially if SD and eMMC contain identical
-Raven images.
-
-The Raven SM partition defines peripheral ownership. The factory `raven-image`
-builds FRDM M7 PX4 firmware, embeds its binary in `imx-boot`, and copies it to
-both boot partitions. `bitbake raven-px4-firmware` also builds the firmware
-alone and deploys its binary and debug ELF. The SWUpdate bundle does not replace
-`imx-boot` yet; boot-container updates and shared-memory validation on hardware
-remain bring-up work.
+`bitbake raven-px4-firmware` builds the M7 firmware alone.
+`bitbake raven-image-swu` builds an A/B update bundle. It includes the rootfs,
+kernel, and FRDM device tree. The bundle does not update `imx-boot`.
+Boot-container updates, boot-slot confirmation, rollback, and inter-core
+communication need hardware validation.
