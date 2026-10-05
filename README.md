@@ -1,8 +1,8 @@
 # meta-raven
 
-Yocto layer for Raven on NXP i.MX95. The current development board is
-FRDM-IMX95; a separate machine configuration will be added for custom Raven
-hardware.
+Raven is an experimental drone project based on NXP i.MX95. This Yocto layer
+builds its Linux image for the FRDM-IMX95 development board; a separate machine
+configuration will be added for custom Raven hardware.
 
 ## Status
 
