@@ -30,6 +30,10 @@ The manifest links the setup script from this layer. It defaults to
 To return to the environment, run `source ./setup-environment build`.
 The script accepts NXP's EULA by default; set `EULA=0` to decline it.
 
+The factory build deploys matching `.wic.zst` and `.wic.bmap` files. Keep them
+together when flashing an SD card with `bmaptool copy`, or pass `-bmap` to UUU
+when flashing eMMC. Confirm the target device before writing the image.
+
 `bitbake raven-px4-firmware` builds the M7 firmware alone.
 `bitbake raven-image-swu` builds an A/B update bundle. It includes the rootfs,
 kernel, and FRDM device tree. The bundle does not update `imx-boot`.

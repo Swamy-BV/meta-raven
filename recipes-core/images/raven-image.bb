@@ -12,8 +12,9 @@ IMAGE_FEATURES:remove = "splash"
 IMAGE_FEATURES += "ssh-server-openssh"
 IMAGE_INSTALL:append = " ros-base demo-nodes-cpp iproute2 ethtool swupdate"
 
-# The SWU bundle consumes this standalone filesystem image, not the factory WIC.
-IMAGE_FSTYPES:append = " ext4.gz"
+# Publish a block map with the compressed factory WIC for bmaptool and UUU.
+# The SWU bundle consumes the standalone filesystem image, not the factory WIC.
+IMAGE_FSTYPES:append = " wic.bmap ext4.gz"
 
 # The boot partition includes the M7 firmware alongside imx-boot.
 do_image_wic[depends] += "raven-px4-firmware:do_deploy"
