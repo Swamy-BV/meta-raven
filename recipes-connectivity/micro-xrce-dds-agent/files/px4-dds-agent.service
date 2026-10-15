@@ -1,0 +1,30 @@
+[Unit]
+Description=PX4 ROS 2 DDS bridge over RPMsg
+Requires=dev-ttyros.device
+After=dev-ttyros.device network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=px4-dds
+Group=px4-dds
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+# DDS consumers run under separate service users; use UDP rather than shared memory.
+Environment=FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+ExecStart=@ROS_PREFIX@/bin/MicroXRCEAgent serial --dev /dev/ttyros -b 921600 -v 3
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+DevicePolicy=closed
+DeviceAllow=/dev/ttyros rw
+TasksMax=64
+MemoryMax=256M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

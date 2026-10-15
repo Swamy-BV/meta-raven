@@ -1,0 +1,151 @@
+Subject: [PATCH] logger: explicitly stream endpoint values with modern fmt
+
+fmt 10 and later no longer implicitly format types with ostream operators.
+Wrap endpoint log arguments with fmt::streamed, preserving the agent's
+existing endpoint representation and keeping diagnostics enabled.
+
+Upstream-Status: Pending
+Signed-off-by: Swamy-BV <74085717+Swamy-BV@users.noreply.github.com>
+---
+diff --git a/include/uxr/agent/transport/SessionManager.hpp b/include/uxr/agent/transport/SessionManager.hpp
+index 3681fc7..11f7bfe 100644
+--- a/include/uxr/agent/transport/SessionManager.hpp
++++ b/include/uxr/agent/transport/SessionManager.hpp
+@@ -75,7 +75,7 @@ void SessionManager<EndPoint>::establish_session(
+             UXR_DECORATE_GREEN("session re-established"),
+             "client_key: 0x{:08X}, address: {}",
+             client_key,
+-            endpoint);
++            fmt::streamed(endpoint));
+     }
+     else
+     {
+@@ -84,7 +84,7 @@ void SessionManager<EndPoint>::establish_session(
+             UXR_DECORATE_GREEN("session established"),
+             "client_key: 0x{:08X}, address: {}",
+             client_key,
+-            endpoint);
++            fmt::streamed(endpoint));
+     }
+
+     if (!has_session_client_key(session_id))
+@@ -114,7 +114,7 @@ void SessionManager<EndPoint>::destroy_session(
+             UXR_DECORATE_GREEN("session closed"),
+             "client_key: 0x{:08X}, address: {}",
+             it->second,
+-            endpoint);
++            fmt::streamed(endpoint));
+         client_to_endpoint_map_.erase(it->second);
+         endpoint_to_client_map_.erase(it->first);
+     }
+@@ -133,7 +133,7 @@ void SessionManager<EndPoint>::destroy_session(
+             UXR_DECORATE_GREEN("session closed"),
+             "client_key: 0x{:08X}, address: {}",
+             client_key,
+-            it->second);
++            fmt::streamed(it->second));
+         endpoint_to_client_map_.erase(it->second);
+         client_to_endpoint_map_.erase(it->first);
+     }
+diff --git a/include/uxr/agent/transport/util/InterfaceLinux.hpp b/include/uxr/agent/transport/util/InterfaceLinux.hpp
+index f77d50d..58697bb 100644
+--- a/include/uxr/agent/transport/util/InterfaceLinux.hpp
++++ b/include/uxr/agent/transport/util/InterfaceLinux.hpp
+@@ -63,7 +63,7 @@ void get_transport_interfaces<IPv4EndPoint>(
+                 UXR_AGENT_LOG_TRACE(
+                     UXR_DECORATE_WHITE("interface found"),
+                     "address: {}",
+-                    transport_addresses.back()
++                    fmt::streamed(transport_addresses.back())
+                 );
+             }
+         }
+@@ -113,7 +113,7 @@ void get_transport_interfaces<IPv6EndPoint>(
+                 UXR_AGENT_LOG_TRACE(
+                     UXR_DECORATE_WHITE("interface found"),
+                     "address: {}",
+-                    transport_addresses.back()
++                    fmt::streamed(transport_addresses.back())
+                 );
+             }
+         }
+diff --git a/src/cpp/middleware/fast/FastEntities.cpp b/src/cpp/middleware/fast/FastEntities.cpp
+index b3c14b3..e0099b0 100644
+--- a/src/cpp/middleware/fast/FastEntities.cpp
++++ b/src/cpp/middleware/fast/FastEntities.cpp
+@@ -40,16 +40,16 @@ void FastListener::onParticipantDiscovery(
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("matched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.info.m_guid.entityId,
+-            info.info.m_guid.guidPrefix);
++            fmt::streamed(info.info.m_guid.entityId),
++            fmt::streamed(info.info.m_guid.guidPrefix));
+     }
+     else
+     {
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("unmatched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.info.m_guid.entityId,
+-            info.info.m_guid.guidPrefix);
++            fmt::streamed(info.info.m_guid.entityId),
++            fmt::streamed(info.info.m_guid.guidPrefix));
+     }
+ }
+
+@@ -62,16 +62,16 @@ void FastListener::onPublicationMatched(
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("matched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.remoteEndpointGuid.entityId,
+-            info.remoteEndpointGuid.guidPrefix);
++            fmt::streamed(info.remoteEndpointGuid.entityId),
++            fmt::streamed(info.remoteEndpointGuid.guidPrefix));
+     }
+     else
+     {
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("unmatched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.remoteEndpointGuid.entityId,
+-            info.remoteEndpointGuid.guidPrefix);
++            fmt::streamed(info.remoteEndpointGuid.entityId),
++            fmt::streamed(info.remoteEndpointGuid.guidPrefix));
+     }
+ }
+
+@@ -84,16 +84,16 @@ void FastListener::onSubscriptionMatched(
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("matched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.remoteEndpointGuid.entityId,
+-            info.remoteEndpointGuid.guidPrefix);
++            fmt::streamed(info.remoteEndpointGuid.entityId),
++            fmt::streamed(info.remoteEndpointGuid.guidPrefix));
+     }
+     else
+     {
+         UXR_AGENT_LOG_TRACE(
+             UXR_DECORATE_WHITE("unmatched"),
+             "entity_id: {}, guid_prefix: {}",
+-            info.remoteEndpointGuid.entityId,
+-            info.remoteEndpointGuid.guidPrefix);
++            fmt::streamed(info.remoteEndpointGuid.entityId),
++            fmt::streamed(info.remoteEndpointGuid.guidPrefix));
+     }
+ }
+
+diff --git a/src/cpp/processor/Processor.cpp b/src/cpp/processor/Processor.cpp
+index 8133d7f..a2d4cfc 100644
+--- a/src/cpp/processor/Processor.cpp
++++ b/src/cpp/processor/Processor.cpp
+@@ -1035,7 +1035,7 @@ void Processor<EndPoint>::check_heartbeats()
+                     UXR_DECORATE_YELLOW("Session destroyed due to liveliness timeout"),
+                     "client_key: 0x{:08X}, address: {}",
+                     raw_key,
+-                    output_packet.destination);
++                    fmt::streamed(output_packet.destination));
+             }
+         }
+     }

@@ -1,7 +1,8 @@
 # Raven FRDM-IMX95 factory image. Sizes are MiB.
 # Preserve the NXP raw imx-boot placement and the 8 MiB area containing
 # U-Boot's current environment at 7 MiB. This WIC is for factory flashing;
-# a SWUpdate package must write only inactive slots, not the whole disk.
+# SWUpdate replaces inactive Linux slots and writes only the reserved raw
+# boot-container range; it must never replace this whole-disk image.
 
 part u-boot --source rawcopy --sourceparams="file=imx-boot.tagged" --ondisk mmcblk --no-table --align ${IMX_BOOT_SEEK}
 

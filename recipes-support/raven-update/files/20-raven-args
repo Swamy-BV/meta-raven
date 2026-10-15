@@ -5,6 +5,12 @@ case "$rootdev" in
     "$(cat /sys/class/block/mmcblk0p4/dev)") update_slot=slot_a ;;
     *) echo "Raven: refusing updates from unknown root filesystem" >&2; exit 1 ;;
 esac
+# SWUpdate reports boot-partition index 6 for EXT_CSD user-area boot enable 7.
+# This bundle's raw boot-container target must agree with the ROM boot source.
+[ "$(swupdate --get-emmc-boot /dev/mmcblk0)" = 6 ] || {
+    echo "Raven: refusing update outside the validated eMMC user-area boot layout" >&2
+    exit 1
+}
 fw_printenv -n bootslot >/dev/null || exit 1
 SWUPDATE_ARGS="$SWUPDATE_ARGS -e stable,$update_slot -p /sbin/reboot"
 SWUPDATE_WEBSERVER_ARGS="$SWUPDATE_WEBSERVER_ARGS -p 8080"

@@ -1,6 +1,6 @@
 software = {
     version = "@@PV@@";
-    description = "Raven Linux A/B update; activates the inactive slot after installation";
+    description = "Raven Linux A/B and shared i.MX boot-container update";
 
     hardware-compatibility: [ "1.0" ];
     embedded-script = "
@@ -62,6 +62,25 @@ software = {
                     device = "/dev/disk/by-partlabel/rootfs_a";
                     hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
+                },
+                {
+                    filename = "@@RAVEN_IMX_BOOT_IMAGE@@";
+                    type = "raw";
+                    device = "/dev/mmcblk0";
+                    offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
+                    hook = "guard_a";
+                    sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                }
+            );
+            scripts: (
+                {
+                    type = "readback";
+                    device = "/dev/mmcblk0";
+                    properties: {
+                        sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                        size = "@@RAVEN_IMX_BOOT_SIZE@@";
+                        offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
+                    };
                 }
             );
         };
@@ -98,6 +117,25 @@ software = {
                     device = "/dev/disk/by-partlabel/rootfs_b";
                     hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
+                },
+                {
+                    filename = "@@RAVEN_IMX_BOOT_IMAGE@@";
+                    type = "raw";
+                    device = "/dev/mmcblk0";
+                    offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
+                    hook = "guard_b";
+                    sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                }
+            );
+            scripts: (
+                {
+                    type = "readback";
+                    device = "/dev/mmcblk0";
+                    properties: {
+                        sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                        size = "@@RAVEN_IMX_BOOT_SIZE@@";
+                        offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
+                    };
                 }
             );
         };

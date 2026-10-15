@@ -1,3 +1,5 @@
+require conf/distro/include/raven-px4.inc
+
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=26fc10a6b30f158c0cd27e3a15215280"
 
@@ -17,12 +19,14 @@ DEPENDS += "\
 "
 SRC_URI = "gitsm://github.com/Swamy-BV/PX4-Autopilot.git;protocol=https;branch=develop;name=px4 \
            git://github.com/OpenAMP/libmetal.git;protocol=https;nobranch=1;name=libmetal;destsuffix=libmetal \
-           git://github.com/OpenAMP/open-amp.git;protocol=https;nobranch=1;name=openamp;destsuffix=open-amp"
-SRCREV_px4 = "734ddb1331195b9852123b56a238c0e856adf036"
+           git://github.com/OpenAMP/open-amp.git;protocol=https;nobranch=1;name=openamp;destsuffix=open-amp \
+           git://github.com/eProsima/Micro-CDR.git;protocol=https;nobranch=1;name=microcdr;destsuffix=microcdr"
+SRCREV_px4 = "${RAVEN_PX4_SRCREV}"
 # Match the dependency revisions selected by NuttX's openamp/Makefile.
 SRCREV_libmetal = "a4bce3507502a7eb9e29bafe0eb174ed5c4316e9"
 SRCREV_openamp = "c468328487a1e0596307a5ef7172756819e15745"
-SRCREV_FORMAT = "px4_libmetal_openamp"
+SRCREV_microcdr = "3d1b17703c7cf4f22def2910bc845bdb5152d7b5"
+SRCREV_FORMAT = "px4_libmetal_openamp_microcdr"
 RAVEN_PX4_TARGET ?= "raven_frdm_default"
 COMPATIBLE_MACHINE = "raven-frdm-imx95"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
@@ -57,6 +61,11 @@ do_configure() {
 }
 
 do_compile() {
+    # The XRCE client clones Micro-CDR through ExternalProject. Redirect only
+    # this task to BitBake's pinned checkout; never fetch from the network here.
+    export GIT_CONFIG_COUNT=1
+    export GIT_CONFIG_KEY_0="url.file://${UNPACKDIR}/microcdr.insteadOf"
+    export GIT_CONFIG_VALUE_0="https://github.com/eProsima/Micro-CDR.git"
     oe_runmake -C ${S} BUILD_DIR_SUFFIX=_yocto PX4_MAKE_ARGS=-j8 ${RAVEN_PX4_TARGET}
 }
 

@@ -23,7 +23,8 @@ IMAGE_INSTALL:append = " \
     libubootenv-bin \
     raven-update-config \
     kernel-module-rpmsg-tty2 \
-    flight-link \
+    micro-xrce-dds-agent \
+    px4-msgs \
     perception-hub \
     media-capture \
     model-runner \
