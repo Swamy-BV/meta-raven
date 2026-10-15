@@ -1,0 +1,44 @@
+Subject: [PATCH] imx95: leave Raven M7-owned GPIO2 untouched by BL31
+Upstream-Status: Inappropriate [embedded specific]
+
+Raven assigns GPIO2 to the M7 domain. BL31's early GPIO ownership
+initialization writes GPIO2 before the console is available, triggering
+an SM TRDC violation and blocking A55 boot. Avoid GPIO2 accesses during
+startup and system sleep on this Raven-specific build.
+
+--- a/plat/imx/imx9/common/imx9_bl31_setup.c
++++ b/plat/imx/imx9/common/imx9_bl31_setup.c
+@@ -102,6 +102,11 @@ void bl31_plat_arch_setup(void)
+ 
+ 	/* Assign all the GPIO pins to non-secure world by default */
+ 	for (unsigned int i = 0U; i < gpio_num; i++) {
++#if defined(PLAT_imx95)
++		/* Raven SM assigns GPIO2 to the M7 domain. */
++		if (gpio_base[i] == GPIO2_BASE)
++			continue;
++#endif
+ 		mmio_write_32(gpio_base[i] + 0x10, 0xffffffff);
+ 		mmio_write_32(gpio_base[i] + 0x14, 0x3);
+ 		mmio_write_32(gpio_base[i] + 0x18, 0xffffffff);
+--- a/plat/imx/imx9/common/imx9_sys_sleep.c
++++ b/plat/imx/imx9/common/imx9_sys_sleep.c
+@@ -242,5 +242,9 @@ void imx9_sys_sleep_prepare(uint32_t core_id)
+ 	/* Save contex of gpios in wakeupmix */
+ 	for (uint32_t i = 0U; i < GPIO_NUM; i++) {
++#if defined(PLAT_imx95)
++		if (gpios[i].base == GPIO2_BASE)
++			continue;
++#endif
+ #if defined(PLAT_imx952) || defined(PLAT_imx937)
+ 		if (gpios[i].base == GPIO2_BASE && gpio2_owned == false)
+ 			continue;
+@@ -278,5 +282,9 @@ void imx9_sys_sleep_unprepare(uint32_t core_id)
+ 	/* Restore contex of gpios in wakeupmix */
+ 	for (uint32_t i = 0U; i < GPIO_NUM; i++) {
++#if defined(PLAT_imx95)
++		if (gpios[i].base == GPIO2_BASE)
++			continue;
++#endif
+ #if defined(PLAT_imx952) || defined(PLAT_imx937)
+ 		if (gpios[i].base == GPIO2_BASE && gpio2_owned == false)
+ 			continue;

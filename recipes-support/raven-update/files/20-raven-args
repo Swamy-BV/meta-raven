@@ -1,0 +1,10 @@
+# Loaded by the upstream SWUpdate launcher after its Mongoose configuration.
+rootdev=$(findmnt -rn -o MAJ:MIN /) || exit 1
+case "$rootdev" in
+    "$(cat /sys/class/block/mmcblk0p2/dev)") update_slot=slot_b ;;
+    "$(cat /sys/class/block/mmcblk0p4/dev)") update_slot=slot_a ;;
+    *) echo "Raven: refusing updates from unknown root filesystem" >&2; exit 1 ;;
+esac
+fw_printenv -n bootslot >/dev/null || exit 1
+SWUPDATE_ARGS="$SWUPDATE_ARGS -e stable,$update_slot -p /sbin/reboot"
+SWUPDATE_WEBSERVER_ARGS="$SWUPDATE_WEBSERVER_ARGS -p 8080"

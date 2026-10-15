@@ -1,0 +1,20 @@
+name: Yocto lint
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oelint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install pre-commit
+        run: python -m pip install pre-commit==4.3.0
+      - name: Check project rules
+        run: pre-commit run --all-files

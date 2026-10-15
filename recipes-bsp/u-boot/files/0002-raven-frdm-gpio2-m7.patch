@@ -1,0 +1,57 @@
+Subject: [PATCH] imx95: keep A55 from accessing M7-owned GPIO2
+Upstream-Status: Inappropriate [embedded specific]
+
+The Raven SM profile grants GPIO2 and ADC1 to M7. Remove SPL's early
+GPIO2 reset and disable both peripherals in the A55 U-Boot device tree.
+
+--- a/arch/arm/dts/imx95-15x15-frdm-u-boot.dtsi
++++ b/arch/arm/dts/imx95-15x15-frdm-u-boot.dtsi
+@@ -48,6 +48,14 @@
+ 	/delete-property/ assigned-clock-parents;
+ };
+ 
++&gpio2 {
++	status = "disabled";
++};
++
++&adc1 {
++	status = "disabled";
++};
++
+ &lpi2c3 {
+ 	bootph-some-ram;
+ };
+--- a/arch/arm/mach-imx/imx9/scmi/soc.c
++++ b/arch/arm/mach-imx/imx9/scmi/soc.c
+@@ -2015,31 +2015,12 @@
+ 	writel(0, gpio_base + 0x1c);
+ }
+ 
+-static int gpio_available(const char *nodes_path)
+-{
+-	ofnode gpio_node = ofnode_path(nodes_path);
+-	const char *status;
+-
+-	if (!ofnode_valid(gpio_node))
+-		return false;
+-
+-	status = ofnode_read_string(gpio_node, "status");
+-
+-	if (status && !strcmp(status, "disabled"))
+-		return false;
+-
+-	return true;
+-}
+-
+ int arch_cpu_init(void)
+ {
+ 	if (IS_ENABLED(CONFIG_XPL_BUILD)) {
+ 		disable_wdog((void __iomem *)WDG3_BASE_ADDR);
+ 		disable_wdog((void __iomem *)WDG4_BASE_ADDR);
+ 
+-		if (gpio_available("/soc/gpio@43810000"))
+-			gpio_reset(GPIO2_BASE_ADDR);
+-
+ 		gpio_reset(GPIO3_BASE_ADDR);
+ 		gpio_reset(GPIO4_BASE_ADDR);
+ 		gpio_reset(GPIO5_BASE_ADDR);

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolov6-nano",
+      "version": "0.3.0",
+      "task": "detection",
+      "backend": "cpu",
+      "adapter": "yolov6",
+      "file": "yolov6n.onnx",
+      "sha256": "f716bde8432f6960d1133cbbebfe576d7f7b11b0222ef502b982ddefddaee709",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "GPL-3.0-only"
+    }
+  ]
+}

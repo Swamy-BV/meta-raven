@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolov4-tiny-neutron",
+      "version": "2.0",
+      "task": "detection",
+      "backend": "neutron",
+      "adapter": "yolov4-tiny",
+      "file": "yolov4-tiny-neutron.tflite",
+      "sha256": "5399df8f990a16d6f1393f88f9dd5bb9932a9ed91d678754f417c10328720518",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "MIT & LicenseRef-YOLO"
+    }
+  ]
+}

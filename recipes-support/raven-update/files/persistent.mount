@@ -1,0 +1,12 @@
+[Unit]
+Description=Raven persistent configuration
+Before=swupdate.service
+
+[Mount]
+What=/dev/disk/by-partlabel/persistent
+Where=/persistent
+Type=ext4
+Options=nosuid,nodev
+
+[Install]
+WantedBy=local-fs.target

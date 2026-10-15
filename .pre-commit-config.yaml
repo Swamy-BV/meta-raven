@@ -1,0 +1,24 @@
+minimum_pre_commit_version: '4.3.0'
+default_language_version:
+  python: python3
+repos:
+  - repo: https://github.com/priv-kweihmann/oelint-adv
+    rev: 7674fb7df4bc7256079e74d06a64372f8597b2ca # 9.11.2
+    hooks:
+      - id: oelint-adv
+        name: oelint-adv (project checks)
+        files: '\.(bb|bbappend|bbclass|inc|conf)$'
+        # Layer constants and documented exceptions are configured in .oelint.cfg.
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: e8b4e28241a9ae8296ba6e4a491b5da4eda73283 # 3.11.1
+    hooks:
+      - id: editorconfig-checker
+        name: BitBake line length (120 characters)
+        files: '\.(bb|bbappend|bbclass|inc|conf)$'
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: e2c2116d86a80e72e7146a06e68b7c228afc6319 # v0.6.13
+    hooks:
+      - id: cmake-format
+        args: [--check, --config-files, config/.cmake-format.json, --]
+      - id: cmake-lint
+        args: [--config-files, config/.cmake-format.json, --]

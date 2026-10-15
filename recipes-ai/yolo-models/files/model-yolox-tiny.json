@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolox-tiny",
+      "version": "0.1.1rc0",
+      "task": "detection",
+      "backend": "cpu",
+      "adapter": "yolox",
+      "file": "yolox-tiny.onnx",
+      "sha256": "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "Apache-2.0"
+    }
+  ]
+}

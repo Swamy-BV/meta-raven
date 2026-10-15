@@ -1,0 +1,22 @@
+# Google formatting with project function-spacing and brace-insertion rules.
+BasedOnStyle: Google
+Standard: c++17
+InsertBraces: true
+InsertNewlineAtEOF: true
+IncludeBlocks: Regroup
+SeparateDefinitionBlocks: Always
+# The matching source header is automatically placed first (priority 0).
+# Recognize project and vendor headers before the standard-library patterns.
+IncludeCategories:
+  - Regex: '^<(detection\.h|local_ipc\.h|raven/.*)>$'
+    Priority: 4
+  - Regex: '^[<"](diagnostic_msgs/|gdk-pixbuf/|gio/|glib[./-]|gst/|gsl/|mavsdk/|nlohmann/|onnxruntime|rclcpp/|std_msgs/|tensorflow/).*'
+    Priority: 3
+  - Regex: '^<.*\.h>$'
+    Priority: 1
+  - Regex: '^<[^/]+>$'
+    Priority: 2
+  - Regex: '^<.*>$'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4

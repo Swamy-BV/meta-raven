@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolov4-tiny",
+      "version": "2.0",
+      "task": "detection",
+      "backend": "cpu",
+      "adapter": "yolov4-tiny",
+      "file": "yolov4-tiny.tflite",
+      "sha256": "2a2a903bafc4d0593ea2274756d55bd042aa2e73bbf42aa97fdc3f6eabd4e067",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "MIT & LicenseRef-YOLO"
+    }
+  ]
+}

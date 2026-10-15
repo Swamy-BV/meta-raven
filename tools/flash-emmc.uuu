@@ -1,0 +1,19 @@
+uuu_version 1.4.149
+
+# Raven FRDM-IMX95 factory eMMC flash. Run with uuu -bmap flash-emmc.uuu.
+# Keep imx-boot.tagged, raven-image.wic and raven-image.wic.bmap beside it.
+# Writes the entire factory partition layout to the eMMC user area.
+# The combined PX4 boot container exceeds this board's 4 MiB boot partition;
+# use its WIC placement at 32 KiB and select the user area for ROM boot.
+
+SDPS: boot -scanterm -f imx-boot.tagged -scanlimited 0x800000
+SDPV: delay 1000
+SDPV: write -f imx-boot.tagged -skipspl -scanterm -scanlimited 0x800000
+SDPV: jump -scanlimited 0x800000
+
+FB: ucmd setenv fastboot_dev mmc
+FB: ucmd setenv mmcdev ${emmc_dev}
+FB: ucmd mmc dev ${emmc_dev} 0
+FB: flash -raw2sparse all raven-image.wic
+FB: ucmd mmc partconf ${emmc_dev} 0 7 0
+FB: done

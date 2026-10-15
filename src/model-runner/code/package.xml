@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>model_runner</name>
+  <version>0.6.1</version>
+  <description>Accelerated inference with standard ROS camera input.</description>
+  <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
+  <license>AGPL-3.0-only</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

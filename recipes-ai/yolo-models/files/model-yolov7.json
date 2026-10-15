@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolov7",
+      "version": "0.1",
+      "task": "detection",
+      "backend": "cpu",
+      "adapter": "yolov7",
+      "file": "yolov7.onnx",
+      "sha256": "db605e553548408ba4bfb9db636e47551ac73bedd0c86537d0afc3590c64e85f",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "GPL-3.0-only"
+    }
+  ]
+}

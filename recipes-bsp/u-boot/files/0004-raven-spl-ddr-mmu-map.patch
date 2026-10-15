@@ -1,0 +1,29 @@
+Subject: [PATCH] imx95-frdm: map relocated DDR SPL before enabling the MMU
+Upstream-Status: Inappropriate [embedded specific]
+
+FRDM starts its normal DRAM mapping at 0x90000000. A DDR SPL at
+0x88240000 and its stack are outside that map, so enabling the MMU
+faults before the preloader console is initialized. Map the dedicated
+32 MiB SPL DDR window during SPL only; retain the normal U-Boot map.
+
+--- a/arch/arm/mach-imx/imx9/scmi/soc.c
++++ b/arch/arm/mach-imx/imx9/scmi/soc.c
+@@ -429,6 +429,18 @@
+ 			 PTE_BLOCK_NON_SHARE |
+ 			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+ 	},
++#endif
++#if IS_ENABLED(CONFIG_XPL_BUILD) && defined(CONFIG_TARGET_IMX95_15X15_FRDM)
++#if CONFIG_SPL_TEXT_BASE >= 0x88000000 && CONFIG_SPL_TEXT_BASE < 0x8a000000
++	{
++		/* DDR SPL and its initial stack precede FRDM's normal DRAM map. */
++		.virt = 0x88000000UL,
++		.phys = 0x88000000UL,
++		.size = 0x02000000UL,
++		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
++			 PTE_BLOCK_OUTER_SHARE
++	},
++#endif
+ #endif
+ #if IS_ENABLED(CONFIG_XPL_BUILD)
+ 	{

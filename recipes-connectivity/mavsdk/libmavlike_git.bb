@@ -1,0 +1,13 @@
+SUMMARY = "MAVLink parser with runtime message definitions"
+DESCRIPTION = "Parses MAVLink messages using runtime XML definitions for MAVSDK"
+HOMEPAGE = "https://github.com/julianoes/libmavlike"
+BUGTRACKER = "https://github.com/julianoes/libmavlike/issues"
+SECTION = "libs"
+LICENSE = "BSD-3-Clause"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=8e5974086ac4189f96d6afe4dc36ddbe"
+DEPENDS = "libtinyxml2 picosha2"
+SRC_URI = "git://github.com/julianoes/libmavlike.git;protocol=https;nobranch=1"
+SRCREV = "90498b14262137ae10b633705810e81bdb85de9c"
+inherit cmake
+EXTRA_OECMAKE = "-DBUILD_TESTING=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+FILES:${PN}-dev += "${datadir}/mav"

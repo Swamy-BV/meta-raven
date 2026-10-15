@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "mobilenet-small", "version": "1.0", "task": "classification", "backend": "cpu",
+      "file": "small.tflite", "sha256": "3799e7cdb3ec44beacaf47ef5c884111c919e51bb50b34ac836244b08d4b953b",
+      "labels": "labels.txt", "labels_sha256": "536feacc519de3d418de26b2effb4d75694a8c4c0063e36499a46fa8061e2da9",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "mobilenet-full", "version": "1.0", "task": "classification", "backend": "cpu",
+      "file": "full.tflite", "sha256": "ecc3a67c47c5a609ec35f6a58a7d97532834e43df4cb7d3f1204a8164b7d20dd",
+      "labels": "labels.txt", "labels_sha256": "536feacc519de3d418de26b2effb4d75694a8c4c0063e36499a46fa8061e2da9",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "ssd-mobilenet-v2", "version": "1.0", "task": "detection", "backend": "cpu",
+      "file": "ssd.tflite", "sha256": "42fb3d70ffb7bb37dd518f730f7be784b831c2078f30c497d0019cc2e987fa26",
+      "labels": "coco-labels.txt", "labels_sha256": "dc183f003fc753c4c43fae6fdf7f387559449573f13fa32e517fb7453fd380f1",
+      "license": "Apache-2.0"
+    }
+  ]
+}

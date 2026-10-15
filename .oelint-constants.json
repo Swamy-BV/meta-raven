@@ -1,0 +1,25 @@
+{
+  "replacements": {
+    "machines": ["raven-frdm-imx95", "mx95-nxp-bsp"],
+    "distros": ["raven"]
+  },
+  "images": {
+    "known-classes": ["ros2_image", "swupdate", "raven_quality", "raven_source"]
+  },
+  "functions": {
+    "known": ["do_image_wic", "do_swuimage"]
+  },
+  "variables": {
+    "known": [
+      "IMX_SYSTEM_MANAGER_SRC", "SRCBRANCH", "IMX_M4_DEMOS",
+      "IMXBOOT_TARGETS", "MKIMAGE_EXTRA_ARGS", "RAVEN_PX4_TARGET",
+      "ROS_BPN", "ROS_IMAGE_BASENAME_APPEND", "IMAGE_DEPENDS",
+      "SWUPDATE_IMAGES", "SWUPDATE_IMAGES_FSTYPES", "do_image_wic", "do_swuimage",
+      "RAVEN_QUALITY_CONFIGDIR", "RAVEN_QUALITY", "RAVEN_QUALITY_FORMAT",
+      "RAVEN_QUALITY_TIDY", "RAVEN_QUALITY_CPPCHECK", "RAVEN_QUALITY_IWYU",
+      "RAVEN_QUALITY_WARNINGS", "RAVEN_QUALITY_WERROR",
+      "RAVEN_SOURCE",
+      "RAVEN_SANITIZER", "RAVEN_NATIVE_CLANG"
+    ]
+  }
+}

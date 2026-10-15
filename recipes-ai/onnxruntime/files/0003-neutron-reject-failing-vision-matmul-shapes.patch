@@ -1,0 +1,27 @@
+Subject: [PATCH] neutron: keep known-failing vision BMM shapes on CPU
+Upstream-Status: Pending
+
+Hardware checks on i.MX95 found incorrect products for inner dimensions
+576 and 768, independent of activation zero point or token count. The VLM final
+projection with K=12288 and N=960 stalls firmware and is followed by an
+SMMU timeout. Decline these shapes so ONNX Runtime retains correct CPU
+execution. Other validated packed matrix shapes remain eligible.
+
+--- a/onnxruntime/core/providers/neutron/neutron_execution_provider.cc
++++ b/onnxruntime/core/providers/neutron/neutron_execution_provider.cc
+@@ -250,6 +250,15 @@
+       bool trans_b = GetTransB(&node);
+       auto rows_index = trans_b ? b_shape->dim_size() - 2 : b_shape->dim_size() - 1;
+       auto b_rows = b_shape->dim(rows_index).dim_value();;
++      const auto cols_index = trans_b ? b_shape->dim_size() - 1 : b_shape->dim_size() - 2;
++      const auto b_cols = b_shape->dim(cols_index).dim_value();
++      // These packed BMM shapes fail hardware validation on i.MX95:
++      // K=576/768 returns incorrect products; K=12288/N=960 stalls the device.
++      // Retain exact CPU semantics until those driver kernels are corrected.
++      if (b_cols == 576 || b_cols == 768 || (b_cols == 12288 && b_rows == 960)) {
++        continue;
++      }
++
+       if (b_rows % 16 || (b_rows * 16 >= 1024*1024) || inits.count(b_input->Name()) == 0) {
+         LOGS_DEFAULT(INFO) << "NeutronEP: "<< node.OpType() << " ("
+                            << node.Name() << ") not supported, invalid B rows.";

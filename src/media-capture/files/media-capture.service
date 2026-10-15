@@ -1,0 +1,43 @@
+[Unit]
+Description=ROS camera frames, photos, recording and streaming
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=media-capture
+Group=media-capture
+WorkingDirectory=/var/lib/media-capture
+LogsDirectory=media-capture
+Environment=ROS_LOG_DIR=/var/log/media-capture
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ExecStart=@ROS_PREFIX@/lib/media_capture/media-capture --ros-args --params-file /etc/media-capture.yaml
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+UMask=0077
+RuntimeDirectory=media-capture
+RuntimeDirectoryMode=0750
+StateDirectory=media-capture
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+DevicePolicy=closed
+# Hardware capture requires an explicit local drop-in allowing its device.
+MemoryMax=256M
+TasksMax=64
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Confirm Raven Linux update after reaching userspace
+After=local-fs.target systemd-udev-settle.service
+Before=swupdate.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/raven-update-confirm
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

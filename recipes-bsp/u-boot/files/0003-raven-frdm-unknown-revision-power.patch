@@ -1,0 +1,20 @@
+Subject: [PATCH] imx95-frdm: avoid invalid GPIO request without board revision
+Upstream-Status: Inappropriate [embedded specific]
+
+Raven reserves ADC1 for M7, so A55 U-Boot cannot use it to identify the
+FRDM board revision. Skip revision-dependent external power control when
+the revision is unavailable. Otherwise ext_pwr_desc is uninitialized and
+dm_gpio_request dereferences a null device pointer.
+
+--- a/board/nxp/imx95_frdm/imx95_frdm.c
++++ b/board/nxp/imx95_frdm/imx95_frdm.c
+@@ -210,4 +210,9 @@ static void setup_typec(void)
+ 		/* Enable EXT PWR */
+ 		ret = get_board_version(rev, data);
++		if (ret) {
++			printf("%s: board revision unavailable; skip EXT PWR setup\n",
++			       __func__);
++			return;
++		}
+ 		if (ret == 0) {
+ 			if (rev[0] < 2) {

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>flight_link</name>
+  <version>0.1.0</version>
+  <description>Read-only flight gateway baseline over MAVSDK.</description>
+  <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
+  <license>AGPL-3.0-only</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>raven_interfaces</depend>
+  <depend>mavsdk</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

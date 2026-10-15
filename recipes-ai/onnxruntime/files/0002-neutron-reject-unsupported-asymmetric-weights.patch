@@ -1,0 +1,52 @@
+Subject: [PATCH] neutron: reject unsupported asymmetric packed matmul weights
+
+The inline packed matrix multiplication kernels reinterpret weights as
+signed int8 and assume weight zero points are zero. Assigning unsigned or
+asymmetrically quantized weights to these kernels silently corrupts results.
+
+Keep unsupported matrix multiplications on CPU. Accept only constant signed
+int8 weights and absent or constant zero-valued weight zero points. Signed,
+symmetric models remain eligible for acceleration.
+
+Upstream-Status: Pending
+
+diff --git a/onnxruntime/core/providers/neutron/neutron_execution_provider.cc b/onnxruntime/core/providers/neutron/neutron_execution_provider.cc
+index 9a6d44c93..8aa320495 100644
+--- a/onnxruntime/core/providers/neutron/neutron_execution_provider.cc
++++ b/onnxruntime/core/providers/neutron/neutron_execution_provider.cc
+@@ -10,6 +10,7 @@
+ #include "core/framework/op_kernel.h"
+ #include "core/providers/neutron/neutron_fwd.h"
+ #include "core/framework/compute_capability.h"
++#include <algorithm>
+ 
+ #ifndef NEUTRON_HAS_DRIVER_BMM
+ #define NEUTRON_HAS_DRIVER_BMM 1
+@@ -224,6 +225,27 @@ NeutronExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
+                "QLinearMatMul" == node.OpType() ||
+                "QGemm" == node.OpType()) {
+       const auto *b_input = input_defs[GetBIndex(node.OpType())];
++      // The packed BMM path consumes signed weights with zero point zero.
++      // Unsigned/asymmetric weights must remain on CPU until supported.
++      const auto b_init = inits.find(b_input->Name());
++      if (b_init == inits.end() ||
++          b_init->second->data_type() != ONNX_NAMESPACE::TensorProto::INT8) {
++        continue;
++      }
++      const size_t b_zp_index = node.OpType() == "MatMulInteger" ? 3 : 5;
++      if (input_defs.size() > b_zp_index && input_defs[b_zp_index]->Exists()) {
++        const auto zp = inits.find(input_defs[b_zp_index]->Name());
++        if (zp == inits.end()) {
++          continue;
++        }
++        const auto& zero_point = *zp->second;
++        if (!std::all_of(zero_point.raw_data().begin(), zero_point.raw_data().end(),
++                         [](char value) { return value == 0; }) ||
++            !std::all_of(zero_point.int32_data().begin(), zero_point.int32_data().end(),
++                         [](int32_t value) { return value == 0; })) {
++          continue;
++        }
++      }
+       const auto *b_shape = b_input->Shape();
+       bool trans_b = GetTransB(&node);
+       auto rows_index = trans_b ? b_shape->dim_size() - 2 : b_shape->dim_size() - 1;

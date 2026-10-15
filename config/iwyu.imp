@@ -1,0 +1,19 @@
+[
+  { "symbol": [ "gint64", "private", "<glib.h>", "public" ] },
+  { "symbol": [ "guint64", "private", "<glib.h>", "public" ] },
+  { "include": [ "\"rclcpp/node.hpp\"", "private", "<rclcpp/node.hpp>", "public" ] },
+  { "include": [ "\"std_msgs/msg/string.hpp\"", "private", "<std_msgs/msg/string.hpp>", "public" ] },
+  { "include": [ "\"third_party/tensorflow/lite/c/common.h\"", "private", "<tensorflow/lite/c/common.h>", "public" ] },
+  { "include": [ "<tensorflow/lite/core/c/c_api.h>", "private", "<tensorflow/lite/c/c_api.h>", "public" ] },
+  { "symbol": [ "gsize", "private", "<glib.h>", "public" ] },
+  { "symbol": [ "gssize", "private", "<glib.h>", "public" ] },
+  { "include": [ "@[<\"]nlohmann/.*[>\"]", "private", "<nlohmann/json.hpp>", "public" ] },
+  { "include": [ "@[<\"]glib/.*[>\"]", "private", "<glib.h>", "public" ] },
+  { "include": [ "@[<\"]gobject/.*[>\"]", "private", "<glib-object.h>", "public" ] },
+  { "include": [ "@[<\"]gio/.*[>\"]", "private", "<gio/gio.h>", "public" ] },
+  { "include": [ "@[<\"]gst/gst[^/]*[.]h[>\"]", "private", "<gst/gst.h>", "public" ] },
+  { "include": [ "@[<\"]gst/video/.*[>\"]", "private", "<gst/video/video.h>", "public" ] },
+  { "include": [ "\"component_type.hpp\"", "private", "<mavsdk/component_type.hpp>", "public" ] },
+  { "include": [ "\"connection_result.hpp\"", "private", "<mavsdk/connection_result.hpp>", "public" ] },
+  { "include": [ "\"system.hpp\"", "private", "<mavsdk/system.hpp>", "public" ] }
+]

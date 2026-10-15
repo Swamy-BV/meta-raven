@@ -1,0 +1,12 @@
+SUMMARY = "MAVLink event metadata and health/arming checks library"
+DESCRIPTION = "Provides MAVLink event metadata and health checks used by MAVSDK"
+HOMEPAGE = "https://github.com/mavlink/libevents"
+BUGTRACKER = "https://github.com/mavlink/libevents/issues"
+SECTION = "libs"
+LICENSE = "BSD-3-Clause"
+LIC_FILES_CHKSUM = "file://LICENSE.md;md5=92eb10e2bbc58e0d704de5f23dd755ef"
+SRC_URI = "git://github.com/mavlink/libevents.git;protocol=https;nobranch=1"
+SRCREV = "840a88ea226d4eb0fd4c391ce860317422756435"
+OECMAKE_SOURCEPATH = "${S}/libs/cpp"
+inherit cmake
+EXTRA_OECMAKE = "-DENABLE_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON"

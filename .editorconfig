@@ -1,0 +1,5 @@
+root = true
+
+# BitBake metadata: long URLs and indivisible expressions need documented exceptions.
+[*.{bb,bbappend,bbclass,inc,conf}]
+max_line_length = 120

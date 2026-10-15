@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+rootdev=$(findmnt -rn -o MAJ:MIN /)
+case "$rootdev" in
+    "$(cat /sys/class/block/mmcblk0p2/dev)") slot=dualA ;;
+    "$(cat /sys/class/block/mmcblk0p4/dev)") slot=dualB ;;
+    *) echo "Raven: refusing to confirm unknown root filesystem" >&2; exit 1 ;;
+esac
+[ "$(fw_printenv -n bootslot)" = "$slot" ] || {
+    echo "Raven: running root filesystem differs from selected boot slot" >&2
+    exit 1
+}
+[ "$(fw_printenv -n upgrade_available 2>/dev/null || true)" = 1 ] || exit 0
+# libubootenv accepts multiple key/value pairs and stores them in one transaction.
+fw_setenv upgrade_available 0 bootcount 0 ustate 0
+for name in upgrade_available bootcount ustate; do
+    [ "$(fw_printenv -n "$name")" = 0 ] || {
+        echo "Raven: boot confirmation did not persist $name" >&2
+        exit 1
+    }
+done
