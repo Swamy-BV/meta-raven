@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>perception_hub</name>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
   <description>Portable inference output interfaces with a model-runner adapter.</description>
   <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
   <license>AGPL-3.0-only</license>
