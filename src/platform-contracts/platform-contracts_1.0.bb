@@ -1,6 +1,6 @@
 SUMMARY = "Raven C++17 domain contracts"
 DESCRIPTION = "Bounded identity, time, geometry, vehicle-state and flight-authority contracts independent of ROS, \
-               MAVSDK and device APIs"
+               transports and device APIs"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "devel"
