@@ -66,7 +66,7 @@ bitbake raven-image-swu
 ```
 
 This target builds the Linux image, PX4 firmware and boot components required
-for the SWUpdate bundle. Setup accepts NXP's EULA; use `EULA=0` to decline.
+for the SWUpdate bundle.
 
 ## License
 
