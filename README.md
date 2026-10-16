@@ -15,9 +15,10 @@ Real-sensor flight validation remains the next stage.
 
 - **Linux + PX4:** Yocto builds the A55 Linux image, M7 PX4/NuttX firmware and
   i.MX boot container together; both cores have been brought up on the board.
-- **Flight telemetry over ROS 2:** PX4 communicates through RPMsg and the Micro
-  XRCE-DDS Agent. On-board ROS 2 telemetry and command/acknowledgement exchange
-  have been verified.
+- **Flight communications:** Independent RPMsg channels carry ROS 2 DDS for
+  onboard applications and routed MAVLink for ground stations. ROS telemetry
+  and command/acknowledgement exchange, plus network MAVLink heartbeat, firmware
+  version and parameter reads have been verified.
 - **Updates without reflashing:** SWUpdate provides web uploads, A/B Linux
   updates and verified writes of the shared i.MX boot container. Slot switching
   and automatic reboot have been tested on hardware.
@@ -47,6 +48,7 @@ flowchart LR
         runner[model-runner]
         perception[perception-hub]
         agent[Micro XRCE-DDS Agent]
+        router[mavlink-router]
         media -->|ROS 2 Image| runner
         perception <-->|Local inference requests / results| runner
     end
@@ -54,6 +56,8 @@ flowchart LR
     perception -->|ROS 2 vision / metadata / health| ros[ROS consumers]
     px4[PX4 on M7] <-->|uXRCE-DDS over RPMsg ttyros| agent
     agent <-->|ROS 2 px4_msgs / fmu topics| ros
+    px4 <-->|MAVLink over RPMsg ttyproxy| router
+    router <-->|MAVLink over Wi-Fi or Ethernet| gcs[Ground station]
 ```
 
 ## Build

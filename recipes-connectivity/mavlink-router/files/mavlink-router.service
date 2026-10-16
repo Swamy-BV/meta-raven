@@ -1,0 +1,30 @@
+[Unit]
+Description=PX4 MAVLink routing over RPMsg
+Requires=dev-ttyproxy.device
+After=dev-ttyproxy.device network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mavlink-router
+Group=mavlink-router
+ExecStart=@BINDIR@/mavlink-routerd -c /etc/mavlink-router/main.conf
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+DevicePolicy=closed
+DeviceAllow=/dev/ttyproxy rw
+TasksMax=32
+MemoryMax=64M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -11,6 +11,7 @@ flowchart LR
         runner[model-runner]
         perception[perception-hub]
         agent[Micro XRCE-DDS Agent]
+        router[mavlink-router]
         media -->|ROS 2 Image| runner
         perception <-->|Local inference requests / results| runner
     end
@@ -18,4 +19,6 @@ flowchart LR
     perception -->|ROS 2 vision / metadata / health| ros[ROS consumers]
     px4[PX4 on M7] <-->|uXRCE-DDS over RPMsg ttyros| agent
     agent <-->|ROS 2 px4_msgs / fmu topics| ros
+    px4 <-->|MAVLink over RPMsg ttyproxy| router
+    router <-->|MAVLink over Wi-Fi or Ethernet| gcs[Ground station]
 ```

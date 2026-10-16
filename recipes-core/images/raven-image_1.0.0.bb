@@ -24,6 +24,7 @@ IMAGE_INSTALL:append = " \
     raven-update-config \
     kernel-module-rpmsg-tty2 \
     micro-xrce-dds-agent \
+    mavlink-router \
     px4-msgs \
     perception-hub \
     media-capture \
