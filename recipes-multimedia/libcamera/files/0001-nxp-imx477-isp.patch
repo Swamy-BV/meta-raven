@@ -1,0 +1,26 @@
+Subject: [PATCH] ipa: register NXP IMX477 helper and tuning data
+Upstream-Status: Inappropriate [enable feature]
+
+Adapted from NXP camera pack a1bba481f39c7bc177893ba3262d7d892d2e9a57
+to the Raven-pinned LF6.18.37_2.1.0 BSP.
+
+--- a/src/ipa/nxp/cam_helper/meson.build
++++ b/src/ipa/nxp/cam_helper/meson.build
+@@ -8,6 +8,7 @@
+     'camera_helper.cpp',
+     'camera_helper_ar0235.cpp',
+     'camera_helper_imx219.cpp',
++    'camera_helper_imx477.cpp',
+     'camera_helper_imx519.cpp',
+     'camera_helper_imx708.cpp',
+     'camera_helper_mx95mbcam.cpp',
+--- a/src/ipa/nxp/neo/data/meson.build
++++ b/src/ipa/nxp/neo/data/meson.build
+@@ -3,6 +3,7 @@
+ conf_files = files([
+     'ar0235.yaml',
+     'imx219.yaml',
++    'imx477.yaml',
+     'imx519.yaml',
+     'imx708.yaml',
+     'mx95mbcam.yaml',

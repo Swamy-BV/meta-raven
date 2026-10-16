@@ -1,0 +1,58 @@
+Subject: [PATCH] media: integrate NXP IMX477 sensor and FRDM CSI overlay
+Upstream-Status: Inappropriate [enable feature]
+
+Adapted from NXP camera pack a1bba481f39c7bc177893ba3262d7d892d2e9a57
+to the Raven-pinned LF6.18.37_2.1.0 BSP.
+
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1585,3 +1585,8 @@
+ 			  s32v234-sbc.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8qm-mek-sof-cs42888.dtb imx8qm-mek-sof-wm8960.dtb \
+ 			  imx8qm-mek-revd-sof-wm8962.dtb imx8qm-mek-sof.dtb
++
++# NXP IMX477 on the dedicated FRDM CSI connector.
++imx95-15x15-frdm-imx477-isp-dtbs := imx95-15x15-frdm.dtb \
++				 imx95-15x15-frdm-imx477.dtbo
++dtb-$(CONFIG_ARCH_MXC) += imx95-15x15-frdm-imx477-isp.dtb
+--- a/arch/arm64/configs/imx_v8_defconfig
++++ b/arch/arm64/configs/imx_v8_defconfig
+@@ -577,6 +577,7 @@
+ CONFIG_VIDEO_MHDP_HDMIRX=y
+ CONFIG_VIDEO_MHDP_HDMIRX_CEC=y
+ CONFIG_VIDEO_IMX219=m
++CONFIG_VIDEO_IMX477=m
+ CONFIG_VIDEO_IMX519=m
+ CONFIG_VIDEO_AK7375=m
+ CONFIG_VIDEO_MT9M114X=y
+--- a/drivers/media/i2c/Kconfig
++++ b/drivers/media/i2c/Kconfig
+@@ -265,6 +265,18 @@
+ 
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called imx412.
++
++config VIDEO_IMX477
++	tristate "Sony IMX477 sensor support"
++	depends on OF_GPIO
++	select MEDIA_CONTROLLER
++	select VIDEO_V4L2_I2C
++	select VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++	  This is a Video4Linux2 sensor driver for the Sony IMX477 camera.
++	  To compile this driver as a module, choose M here: the
++	  module will be called imx477.
+ 
+ config VIDEO_IMX415
+ 	tristate "Sony IMX415 sensor support"
+--- a/drivers/media/i2c/Makefile
++++ b/drivers/media/i2c/Makefile
+@@ -60,6 +60,7 @@
+ obj-$(CONFIG_VIDEO_IMX355) += imx355.o
+ obj-$(CONFIG_VIDEO_IMX412) += imx412.o
+ obj-$(CONFIG_VIDEO_IMX415) += imx415.o
++obj-$(CONFIG_VIDEO_IMX477) += imx477.o
+ obj-$(CONFIG_VIDEO_IMX519) += imx519.o
+ obj-$(CONFIG_VIDEO_IR_I2C) += ir-kbd-i2c.o
+ obj-$(CONFIG_VIDEO_ISL7998X) += isl7998x.o

@@ -1,0 +1,41 @@
+Subject: [PATCH] ipa: register NXP IMX477 helper and tuning database
+Upstream-Status: Inappropriate [enable feature]
+
+Adapted from NXP camera pack a1bba481f39c7bc177893ba3262d7d892d2e9a57
+to the Raven-pinned LF6.18.37_2.1.0 BSP.
+
+--- a/cam_helper/meson.build
++++ b/cam_helper/meson.build
+@@ -4,6 +4,7 @@
+     'camera_helper.cpp',
+     'camera_helper_ar0235.cpp',
+     'camera_helper_imx219.cpp',
++    'camera_helper_imx477.cpp',
+     'camera_helper_imx519.cpp',
+     'camera_helper_imx708.cpp',
+     'camera_helper_mx95mbcam.cpp',
+--- a/data/config_ipa_uguzzi.yaml
++++ b/data/config_ipa_uguzzi.yaml
+@@ -99,4 +99,12 @@
+         dtp-file: database_ox05b1s_dual_2592-1944_10bpp.bin
+         tuning-id: [ 2011, 2012 ]
+         tuning-mode: 0
++  - model: imx477
++    profiles:
++      - resolution: [3840, 2160]
++        bit-depth: 12
++        dtp-file: database_imx477_3840_2160.bin
++        tuning-id: 2010
++        tuning-mode: 0
++    socket-port: 50020
+ ...
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -5,6 +5,7 @@
+     'database_os08a20_SDR_3840-2160_12bpp.bin',
+     'database_os08a20_HDR_3840-2160_12bpp.bin',
+     'database_ox05b1s_dual_2592-1944_10bpp.bin',
++    'database_imx477_3840_2160.bin',
+     'config_ipa_uguzzi.yaml',
+ ])
+ 

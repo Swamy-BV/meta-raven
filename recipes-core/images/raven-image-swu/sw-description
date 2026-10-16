@@ -46,12 +46,12 @@ software = {
                     sha256 = "$swupdate_get_sha256(Image)";
                 },
                 {
-                    filename = "imx95-15x15-frdm.dtb";
+                    filename = "@@RAVEN_CAMERA_DTB@@";
                     path = "/imx95-15x15-frdm.dtb";
                     device = "/dev/disk/by-partlabel/boot_a";
                     hook = "guard_a";
                     filesystem = "vfat";
-                    sha256 = "$swupdate_get_sha256(imx95-15x15-frdm.dtb)";
+                    sha256 = "$swupdate_get_sha256(@@RAVEN_CAMERA_DTB@@)";
                 }
             );
             images: (
@@ -101,12 +101,12 @@ software = {
                     sha256 = "$swupdate_get_sha256(Image)";
                 },
                 {
-                    filename = "imx95-15x15-frdm.dtb";
+                    filename = "@@RAVEN_CAMERA_DTB@@";
                     path = "/imx95-15x15-frdm.dtb";
                     device = "/dev/disk/by-partlabel/boot_b";
                     hook = "guard_b";
                     filesystem = "vfat";
-                    sha256 = "$swupdate_get_sha256(imx95-15x15-frdm.dtb)";
+                    sha256 = "$swupdate_get_sha256(@@RAVEN_CAMERA_DTB@@)";
                 }
             );
             images: (
