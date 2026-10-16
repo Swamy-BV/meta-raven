@@ -1,3 +1,5 @@
+# Components
+
 ```mermaid
 flowchart LR
     source[Camera / network video / replay] --> media
