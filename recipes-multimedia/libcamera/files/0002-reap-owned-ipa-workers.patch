@@ -1,0 +1,35 @@
+From: Raven maintainers
+Subject: [PATCH] libcamera: reap owned process during destruction
+
+Destroying an isolated IPA proxy kills its worker but removes the pidfd
+notifier before it can collect the exit status. Reconfiguring a camera then
+leaves one zombie worker per session. Wait for the owned child after SIGKILL;
+do not install an application-wide SIGCHLD handler or reap unrelated children.
+
+Upstream-Status: Pending
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+--- a/src/libcamera/process.cpp
++++ b/src/libcamera/process.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include <algorithm>
+ #include <dirent.h>
++#include <errno.h>
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <string.h>
+@@ -118,8 +119,12 @@
+ 
+ Process::~Process()
+ {
++	pidfdNotify_.reset();
+ 	kill();
+-	/* \todo wait for child process to exit */
++	if (pid_ > 0) {
++		while (waitpid(pid_, nullptr, 0) < 0 && errno == EINTR) {
++		}
++	}
+ }
+ 
+ /**

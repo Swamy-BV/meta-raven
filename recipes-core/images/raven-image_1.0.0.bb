@@ -28,6 +28,8 @@ IMAGE_INSTALL:append = " \
     px4-msgs \
     perception-hub \
     media-capture \
+    camera-mavlink \
+    mediamtx \
     neo-ipa-uguzzi \
     kernel-module-imx477 \
     model-runner \

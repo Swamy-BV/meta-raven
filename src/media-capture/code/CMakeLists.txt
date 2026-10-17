@@ -11,7 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(std_srvs REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(raven_interfaces REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(PlatformContracts REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(
@@ -23,10 +25,18 @@ pkg_check_modules(
   gstreamer-video-1.0
   gio-unix-2.0
   gdk-pixbuf-2.0)
-add_library(media-pipeline STATIC pipeline_graph.cpp)
-target_link_libraries(media-pipeline PRIVATE PkgConfig::GSTREAMER)
-add_executable(media-capture main.cpp adapters/gstreamer/capture.cpp adapters/ros/node.cpp adapters/ros/settings.cpp)
-target_link_libraries(media-capture media-pipeline PkgConfig::GSTREAMER Raven::platform-contracts)
+add_executable(
+  media-capture
+  main.cpp
+  core/validation.cpp
+  application/session.cpp
+  adapters/gstreamer/backend.cpp
+  adapters/gstreamer/pipeline.cpp
+  adapters/storage/photo_store.cpp
+  adapters/ros/node.cpp
+  adapters/ros/settings.cpp)
+target_link_libraries(media-capture PkgConfig::GSTREAMER Raven::platform-contracts)
+target_include_directories(media-capture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 ament_target_dependencies(
   media-capture
   SYSTEM
@@ -34,7 +44,9 @@ ament_target_dependencies(
   rcl_interfaces
   image_transport
   sensor_msgs
-  std_srvs)
+  rclcpp_action
+  raven_interfaces
+  diagnostic_msgs)
 install(TARGETS media-capture RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

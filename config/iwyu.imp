@@ -1,4 +1,6 @@
 [
+  { "include": [ "\"../protocol.h\"", "private", "<mavlink/v2.0/common/mavlink.h>", "public" ] },
+  { "include": [ "@[<\"]mavlink/v2[.]0/.*[>\"]", "private", "<mavlink/v2.0/common/mavlink.h>", "public" ] },
   { "symbol": [ "gint64", "private", "<glib.h>", "public" ] },
   { "symbol": [ "guint64", "private", "<glib.h>", "public" ] },
   { "include": [ "\"rclcpp/node.hpp\"", "private", "<rclcpp/node.hpp>", "public" ] },

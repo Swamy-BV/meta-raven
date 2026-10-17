@@ -1,0 +1,7 @@
+bool auto_exposure
+uint32 exposure_time_us
+bool auto_white_balance
+uint32 colour_temperature
+---
+bool success
+string error

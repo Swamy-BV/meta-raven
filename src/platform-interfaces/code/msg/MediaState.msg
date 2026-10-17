@@ -1,0 +1,13 @@
+std_msgs/Header header
+string source
+string mode
+bool ready
+bool recording
+bool streaming
+bool capturing
+uint32 image_count
+uint64 free_bytes
+uint64 total_bytes
+string recording_id
+string error
+MediaProfile[] profiles

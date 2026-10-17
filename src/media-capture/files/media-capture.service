@@ -1,6 +1,7 @@
 [Unit]
 Description=ROS camera frames, photos, recording and streaming
 After=network.target
+RequiresMountsFor=/data
 StartLimitIntervalSec=120
 StartLimitBurst=3
 
@@ -8,7 +9,7 @@ StartLimitBurst=3
 Type=simple
 User=media-capture
 Group=media-capture
-WorkingDirectory=/var/lib/media-capture
+WorkingDirectory=/data/media-capture
 LogsDirectory=media-capture
 Environment=ROS_LOG_DIR=/var/log/media-capture
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
@@ -17,12 +18,13 @@ Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ExecStart=@ROS_PREFIX@/lib/media_capture/media-capture --ros-args --params-file /etc/media-capture.yaml
 Restart=on-failure
 RestartSec=10
+# Let libcamera stop its IPA workers before terminating the whole group.
+KillMode=mixed
 TimeoutStopSec=10
 UMask=0077
 RuntimeDirectory=media-capture
 RuntimeDirectoryMode=0750
-StateDirectory=media-capture
-StateDirectoryMode=0750
+ReadWritePaths=/data/media-capture
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 ProtectSystem=strict
@@ -35,7 +37,7 @@ RestrictSUIDSGID=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 DevicePolicy=closed
 # Hardware capture requires an explicit local drop-in allowing its device.
-MemoryMax=256M
+MemoryMax=512M
 TasksMax=64
 CPUQuota=200%
 

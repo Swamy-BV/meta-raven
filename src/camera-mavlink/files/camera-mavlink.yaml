@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    system_id: 1
+    component_id: 100
+    router_port: 5760
+    camera_namespace: /raven/vehicle_1/cameras/front
+    # Set a ground-station-reachable RTSP URI to advertise video discovery.
+    stream_uri: ""

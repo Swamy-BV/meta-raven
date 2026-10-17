@@ -1,35 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
 #include <sys/stat.h>
 
 #include <exception>
 #include <iostream>
-#include <stdexcept>
-#include <string>
-#include <vector>
+#include <memory>
 
-#include <rclcpp/init_options.hpp>
+#include <rclcpp/executors.hpp>
 #include <rclcpp/utilities.hpp>
 
-#include "adapters/gstreamer/capture.h"
+#include "adapters/gstreamer/backend.h"
 #include "adapters/ros/node.h"
-#include "media_config.h"
+#include "adapters/storage/photo_store.h"
+#include "core/types.h"
 
 int main(int argc, char** argv) {
   constexpr auto kPrivateFileUmask = 0077;
   try {
-    if (rclcpp::remove_ros_arguments(argc, argv).size() != 1) {
-      throw std::invalid_argument("use ROS parameters and remapping arguments");
-    }
     umask(kPrivateFileUmask);
-    rclcpp::init(argc, argv, rclcpp::InitOptions{},
-                 rclcpp::SignalHandlerOptions::None);
-    int result = 0;
-    {
-      raven::media::MediaCaptureNode output;
-      result = RunCapture(output.Settings(), output);
-    }
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<raven::media::MediaCaptureNode>(
+        std::make_unique<raven::media::GstreamerBackend>(),
+        [](const raven::media::Settings& settings) {
+          return std::make_unique<raven::media::PhotoStore>(
+              settings.output_dir, settings.max_photos);
+        });
+    rclcpp::spin(node);
+    node->Stop();
     rclcpp::shutdown();
-    return result;
+    return 0;
   } catch (const std::exception& error) {
     std::cerr << "media-capture: " << error.what() << '\n';
     if (rclcpp::ok()) {

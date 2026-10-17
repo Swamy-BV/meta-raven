@@ -1,0 +1,10 @@
+std_msgs/Header header
+string[] sources
+string[] controls
+string[] modes
+bool hardware_encoding
+bool independent_profiles
+bool photo_during_recording
+uint32 max_width
+uint32 max_height
+string[] limitations

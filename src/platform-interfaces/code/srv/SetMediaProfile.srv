@@ -1,0 +1,5 @@
+MediaProfile profile
+---
+bool success
+string error
+MediaProfile effective

@@ -1,0 +1,11 @@
+[Unit]
+Description=Raven shared media and application data
+
+[Mount]
+What=/dev/disk/by-partlabel/data
+Where=/data
+Type=ext4
+Options=nosuid,nodev
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,29 @@
+[Unit]
+Description=MAVLink camera protocol over ROS capture controls
+After=network.target mavlink-router.service media-capture.service
+Wants=mavlink-router.service media-capture.service
+
+[Service]
+User=camera-mavlink
+Group=camera-mavlink
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=ROS_LOG_DIR=/var/log/camera-mavlink
+LogsDirectory=camera-mavlink
+ExecStart=@ROS_PREFIX@/lib/camera_mavlink/camera-mavlink --ros-args --params-file /etc/camera-mavlink.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

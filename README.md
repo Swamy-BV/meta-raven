@@ -25,11 +25,11 @@ physical flight with real sensors and actuators remains to be validated.
 - **Updates without reflashing:** SWUpdate provides web uploads, A/B Linux
   updates and verified writes of the shared i.MX boot container. Slot switching
   and automatic reboot have been tested on hardware.
-- **Media capture:** A GStreamer-based ROS 2 node supports camera, network video
-  and replay inputs, with image publication, photos, recording and RTP streaming.
-  Arducam IMX477 capture through NXP's camera/ISP stack has been demonstrated at
-  640 x 360, 15 fps, with matching ROS Image/CameraInfo messages and JPEG photos.
-  Runtime recording controls and ground-station camera commands are next.
+- **Media capture:** The ROS 2 camera node separates source adapters, capture
+  sessions, photos, recording and preview. IMX477 3840 x 2160 JPEG capture and
+  hardware-encoded 1280 x 720 browser video have been tested. ROS images and
+  CameraInfo share frame timestamps. Photo sequences, recording controls and
+  camera commands from a laptop and PX4 M7 use the same ROS operations.
 - **Model execution:** `model-runner` supports model selection and isolated
   TensorFlow Lite / ONNX inference. Neutron NPU object detection has been exercised;
   acceleration depends on the model and supported operators.
@@ -39,9 +39,9 @@ physical flight with real sensors and actuators remains to be validated.
   answer experiments have produced responses. These remain experiments; VLM
   execution has required CPU fallback and is not a validated NPU-only pipeline.
 
-Latest bench deployment (16 October 2026): SIH was installed through a boot-only
-SWUpdate bundle, and mavlink-router was installed separately. The full SWUpdate
-bundle containing all current changes has not yet been rebuilt and deployed.
+The bench runs SIH firmware on M7 and Yocto-built camera packages on Linux.
+Camera controls and streaming are tested through package deployment; the full
+SWUpdate bundle has not been installed in this bench configuration.
 
 ## Components
 
@@ -49,23 +49,26 @@ Component recipes, code and deployment files live together under `src/`.
 
 ```mermaid
 flowchart LR
-    source[Camera / network video / replay] --> media
-    media -->|RTP video| receiver[Video receiver]
-    media -->|ROS 2 Image / CameraInfo| ros
-
+    source[CSI / USB camera / files / network / ROS images] --> media
     subgraph linux[Linux]
         media[media-capture]
+        camera[camera-mavlink]
+        video[MediaMTX]
         runner[model-runner]
         perception[perception-hub]
         agent[Micro XRCE-DDS Agent]
         router[mavlink-router]
-        media -->|ROS 2 Image| runner
-        perception <-->|Local inference requests / results| runner
+        camera <-->|ROS controls / state / capture events| media
+        camera <-->|Camera MAVLink| router
+        media -->|H.264 RTP| video
+        media -->|ROS Image| runner
+        perception <-->|Inference requests / results| runner
     end
-
-    perception -->|ROS 2 vision / metadata / health| ros[ROS consumers]
+    video -->|WebRTC| browser[Browser preview]
+    media <-->|Image / CameraInfo / services / actions| ros[ROS applications]
+    perception -->|ROS vision / metadata / health| ros
     px4[PX4 on M7] <-->|uXRCE-DDS over RPMsg ttyros| agent
-    agent <-->|ROS 2 px4_msgs / fmu topics| ros
+    agent <-->|ROS px4_msgs / fmu topics| ros
     px4 <-->|MAVLink over RPMsg ttyproxy| router
     router <-->|MAVLink over Wi-Fi or Ethernet| gcs[Ground station]
 ```

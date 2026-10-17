@@ -3,3 +3,7 @@ root = true
 # BitBake metadata: long URLs and indivisible expressions need documented exceptions.
 [*.{bb,bbappend,bbclass,inc,conf}]
 max_line_length = 120
+
+# OE's Go module generator emits indivisible dependency and checksum URIs.
+[recipes-multimedia/mediamtx/mediamtx-{go-mods,licenses}.inc]
+max_line_length = off

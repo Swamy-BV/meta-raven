@@ -1,0 +1,10 @@
+# Zero count means capture until cancelled; interval is seconds.
+string request_id
+uint32 count
+float64 interval
+---
+uint32 completed
+string last_uri
+string error
+---
+MediaCaptureEvent capture

@@ -15,6 +15,9 @@ struct CameraFrame {
   std::vector<std::uint8_t> data;
   std::uint64_t sequence = 0, captured_us = 0, pts_ns = 0;
   std::uint64_t captured_unix_us = 0;
+  // Original ROS clock stamp, when supplied by a ROS image source. Retain
+  // nanosecond precision rather than reconstructing it from the Unix mapping.
+  std::uint64_t source_stamp_ns = 0;
   bool pts_valid = false, source_time_mapped = false;
   int width = 0, height = 0;
   std::string optical_frame;

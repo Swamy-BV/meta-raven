@@ -8,7 +8,9 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>rclcpp</depend>
   <depend>rcl_interfaces</depend>
-  <depend>std_srvs</depend>
+  <depend>rclcpp_action</depend>
+  <depend>raven_interfaces</depend>
+  <depend>diagnostic_msgs</depend>
   <depend>image_transport</depend>
   <depend>sensor_msgs</depend>
   <export><build_type>ament_cmake</build_type></export>

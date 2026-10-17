@@ -1,0 +1,51 @@
+From: Raven maintainers
+Subject: [PATCH] Allow builds without Raspberry Pi camera helper
+
+The Raven camera node owns capture; MediaMTX receives encoded RTP only.
+Avoid bundling an unrelated downloaded Raspberry Pi executable.
+
+Upstream-Status: Inappropriate [configuration]
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+--- a/internal/staticsources/rpicamera/camera_arm_.go
++++ b/internal/staticsources/rpicamera/camera_arm_.go
+@@ -1 +1 @@
+-//go:build (linux && arm) || (linux && arm64)
++//go:build !norpicamera && linux && (arm || arm64)
+--- a/internal/staticsources/rpicamera/camera_params_arm_.go
++++ b/internal/staticsources/rpicamera/camera_params_arm_.go
+@@ -1 +1 @@
+-//go:build (linux && arm) || (linux && arm64)
++//go:build !norpicamera && linux && (arm || arm64)
+--- a/internal/staticsources/rpicamera/pipe_arm_.go
++++ b/internal/staticsources/rpicamera/pipe_arm_.go
+@@ -1 +1 @@
+-//go:build (linux && arm) || (linux && arm64)
++//go:build !norpicamera && linux && (arm || arm64)
+--- a/internal/staticsources/rpicamera/source_arm_.go
++++ b/internal/staticsources/rpicamera/source_arm_.go
+@@ -1 +1 @@
+-//go:build (linux && arm) || (linux && arm64)
++//go:build !norpicamera && linux && (arm || arm64)
+--- a/internal/staticsources/rpicamera/supports_hardware_h264_arm_.go
++++ b/internal/staticsources/rpicamera/supports_hardware_h264_arm_.go
+@@ -1 +1 @@
+-//go:build (linux && arm) || (linux && arm64)
++//go:build !norpicamera && linux && (arm || arm64)
+--- a/internal/staticsources/rpicamera/camera_linux_arm.go
++++ b/internal/staticsources/rpicamera/camera_linux_arm.go
+@@ -1 +1,3 @@
++//go:build !norpicamera
++
+ package rpicamera
+--- a/internal/staticsources/rpicamera/camera_linux_arm64.go
++++ b/internal/staticsources/rpicamera/camera_linux_arm64.go
+@@ -1 +1,3 @@
++//go:build !norpicamera
++
+ package rpicamera
+--- a/internal/staticsources/rpicamera/source_other.go
++++ b/internal/staticsources/rpicamera/source_other.go
+@@ -1 +1 @@
+-//go:build !linux || (!arm && !arm64)
++//go:build norpicamera || !linux || (!arm && !arm64)

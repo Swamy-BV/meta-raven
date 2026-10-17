@@ -1,0 +1,22 @@
+[Unit]
+Description=Encoded video routing and browser preview
+After=network.target
+
+[Service]
+User=mediamtx
+Group=mediamtx
+ExecStart=/usr/bin/mediamtx /etc/mediamtx.yml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+CapabilityBoundingSet=
+RestrictSUIDSGID=true
+MemoryMax=128M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

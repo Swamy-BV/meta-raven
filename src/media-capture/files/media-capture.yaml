@@ -1,14 +1,28 @@
 /**:
   ros__parameters:
     source: test
-    codec: h264
-    converter: g2d
-    width: 640
-    height: 360
-    fps: 15
+    converter: software
+    source_width: 0
+    source_height: 0
     optical_frame: camera_optical_frame
-    stream: false
+    mode: video
+    photo_width: 1920
+    photo_height: 1080
+    photo_quality: 90
+    preview_width: 1280
+    preview_height: 720
+    preview_fps: 15
+    preview_bitrate_kbps: 2000
+    video_width: 1280
+    video_height: 720
+    video_fps: 15
+    video_bitrate_kbps: 2000
+    ros_width: 640
+    ros_height: 360
+    ros_fps: 15
+    streaming: false
     recording: false
-    output_dir: media
-    rtp_address: 127.0.0.1
-    rtp_port: 5602
+    output_dir: .
+    stream_host: 127.0.0.1
+    stream_port: 5600
+    segment_seconds: 60
