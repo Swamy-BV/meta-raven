@@ -1,0 +1,27 @@
+From: Raven Project <raven@local>
+Subject: [PATCH] arm64: dts: add isolated Raven FRDM-IMX95 baseline
+Upstream-Status: Inappropriate [Raven board integration]
+
+Inherit the NXP FRDM hardware description without modifying the official board.
+
+diff --git a/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts b/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++#include "imx95-15x15-frdm.dts"
++
++/ {
++	model = "Raven development platform on NXP FRDM-IMX95";
++	compatible = "raven,frdm-imx95", "fsl,frdm-imx95", "fsl,imx95";
++};
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1585,3 +1585,5 @@
+ 			  s32v234-sbc.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8qm-mek-sof-cs42888.dtb imx8qm-mek-sof-wm8960.dtb \
+ 			  imx8qm-mek-revd-sof-wm8962.dtb imx8qm-mek-sof.dtb
++
++dtb-$(CONFIG_ARCH_MXC) += raven-frdm-imx95.dtb
