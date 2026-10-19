@@ -720,7 +720,7 @@ namespace raven::vision {
 struct Engine::Impl {
   Runner runner;
   std::uint64_t max_age_us;
-  std::string metadata_key;
+  std::string metadata_key, restore_error;
   std::vector<std::string> labels;
 
   Impl(const std::string& config, FrameProvider frames, std::uint64_t age)
@@ -781,22 +781,29 @@ std::vector<std::string> Engine::Models() const {
   return ids;
 }
 
-std::string Engine::SavedModel() const {
+std::string Engine::InitialModel(const std::string& fallback) {
   const auto& runner = impl_->runner;
   const auto path = runner.c.state / "active.json";
   if (!fs::exists(path)) {
+    return fallback;
+  }
+  try {
+    const auto active = ReadJson(path);
+    const auto model = runner.Find(active.at("id"));
+    if (active.at("sha256") != model.sha ||
+        active.at("version") != model.version ||
+        active.at("labels_sha256") != model.labels_sha) {
+      Fail(
+          "saved model revision changed; explicitly select or unload the "
+          "model");
+    }
+    return model.id;
+  } catch (const std::exception& error) {
+    // Stay available for an explicit ROS selection instead of restarting or
+    // silently loading a different model after an incompatible saved selection.
+    impl_->restore_error = error.what();
     return {};
   }
-  const auto active = ReadJson(path);
-  const auto model = runner.Find(active.at("id"));
-  if (active.at("sha256") != model.sha ||
-      active.at("version") != model.version ||
-      active.at("labels_sha256") != model.labels_sha) {
-    Fail(
-        "saved model revision changed; remove saved selection or select "
-        "explicitly");
-  }
-  return model.id;
 }
 
 void Engine::Select(const std::string& id) {
@@ -807,6 +814,7 @@ void Engine::Select(const std::string& id) {
   } else {
     runner.Start(runner.Find(id), runner.c.demo, true);
   }
+  impl_->restore_error.clear();
 }
 
 void Engine::Cancel() { impl_->runner.cancel = true; }
@@ -824,11 +832,15 @@ Snapshot Engine::Poll(bool automatic) {
   const auto status = impl_->Status();
   Snapshot snapshot;
   const auto& job = status.at("last_job");
-  snapshot.failed = !job.is_null() && job.at("state") == "failed";
+  snapshot.failed = !impl_->restore_error.empty() ||
+                    (!job.is_null() && job.at("state") == "failed");
   if (status.at("selected").get<std::string>().empty()) {
-    snapshot.health = snapshot.failed
-                          ? job.value("error", "Model selection failed")
-                          : "Waiting for model selection";
+    snapshot.health = "Waiting for model selection";
+    if (!impl_->restore_error.empty()) {
+      snapshot.health = impl_->restore_error;
+    } else if (snapshot.failed) {
+      snapshot.health = job.value("error", "Model selection failed");
+    }
     return snapshot;
   }
   snapshot.identity = ActiveIdentity(status);

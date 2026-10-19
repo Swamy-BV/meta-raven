@@ -24,7 +24,7 @@ class Engine final {
   Engine(Engine&&) = delete;
   Engine& operator=(Engine&&) = delete;
   [[nodiscard]] std::vector<std::string> Models() const;
-  [[nodiscard]] std::string SavedModel() const;
+  [[nodiscard]] std::string InitialModel(const std::string& fallback);
   // Selection validates asynchronously; the active identity changes only on
   // success. An empty ID unloads the model. Busy requests throw without
   // changing selection.

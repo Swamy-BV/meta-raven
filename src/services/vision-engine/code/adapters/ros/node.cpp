@@ -112,11 +112,8 @@ void VisionNode::Configure() {
                                               options);
   const auto fallback =
       declare_parameter<std::string>("default_model", "", options);
-  auto selected = engine_->SavedModel();
-  if (selected.empty()) {
-    selected = fallback;
-  }
-  selected = declare_parameter<std::string>("model", selected);
+  const auto selected =
+      declare_parameter<std::string>("model", engine_->InitialModel(fallback));
   declare_parameter<bool>("auto_infer", true);
   if (!selected.empty()) {
     engine_->Select(selected);
