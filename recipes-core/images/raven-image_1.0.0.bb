@@ -13,7 +13,12 @@ ROS_IMAGE_BASENAME_APPEND = ""
 
 # Console image: retain hardware support, but no splash screen or desktop.
 IMAGE_FEATURES:remove = "splash"
-IMAGE_FEATURES += "ssh-server-openssh"
+IMAGE_FEATURES += "ssh-server-openssh read-only-rootfs"
+
+# SWUpdate writes this filesystem directly; match the factory A/B slot sizes.
+IMAGE_ROOTFS_SIZE = "${@str(int(d.getVar('RAVEN_ROOTFS_SIZE_MIB')) * 1024)}"
+IMAGE_ROOTFS_MAXSIZE = "${IMAGE_ROOTFS_SIZE}"
+IMAGE_ROOTFS_EXTRA_SPACE = "0"
 IMAGE_INSTALL:append = " \
     ros-base \
     iproute2 \

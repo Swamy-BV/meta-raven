@@ -8,13 +8,14 @@ index 88a496e..f19ab4b 100644
 +++ b/board/nxp/imx95_frdm/imx95_frdm.env
 @@ -78,6 +78,12 @@ mmcdev=CONFIG_ENV_MMC_DEVICE_INDEX
  mmcpart=1
- mmcroot=/dev/mmcblk1p2 rootwait rw
+-mmcroot=/dev/mmcblk1p2 rootwait rw
++mmcroot=/dev/mmcblk1p2 rootwait ro
  mmcautodetect=yes
 +bootslot=dualA
 +adjustbootsource=if test ${bootslot} = dualB; then
-+		setenv mmcpart 3; setenv mmcroot /dev/mmcblk${mmcdev}p4 rootwait rw;
++		setenv mmcpart 3; setenv mmcroot /dev/mmcblk${mmcdev}p4 rootwait ro;
 +	else
-+		setenv mmcpart 1; setenv mmcroot /dev/mmcblk${mmcdev}p2 rootwait rw;
++		setenv mmcpart 1; setenv mmcroot /dev/mmcblk${mmcdev}p2 rootwait ro;
 +	fi
  mmcargs=setenv bootargs ${jh_clk} ${mcore_args} console=${console} root=${mmcroot}
  prepare_mcore=setenv mcore_args pd_ignore_unused;

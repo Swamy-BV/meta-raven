@@ -1,0 +1,11 @@
+[Unit]
+Description=Raven persistent overlay storage
+
+[Mount]
+What=/dev/disk/by-partlabel/overlay
+Where=/overlay
+Type=ext4
+Options=nosuid,nodev
+
+[Install]
+WantedBy=local-fs.target

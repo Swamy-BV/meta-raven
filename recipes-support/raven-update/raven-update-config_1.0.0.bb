@@ -1,5 +1,5 @@
-SUMMARY = "Raven A/B update and persistent network configuration"
-DESCRIPTION = "Installs A/B update selection, boot confirmation and persistent Wi-Fi configuration"
+SUMMARY = "Raven A/B updates and persistent state"
+DESCRIPTION = "Installs A/B update selection, persistent networking and per-slot writable state on a read-only root"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "base"
@@ -9,15 +9,17 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c5
 SRC_URI = "file://fw_env.config file://hwrevision file://persistent.mount file://data.mount \
            file://80-raven-wifi.network file://raven-wifi.conf file://raven-update-confirm \
            file://raven-update-confirm.service file://20-raven-args \
-           file://raven.conf"
+           file://raven.conf file://overlay.mount file://raven-overlay-prepare \
+           file://raven-overlay-prepare.service file://var-lib.conf"
 S = "${UNPACKDIR}"
 
-inherit systemd
+inherit overlayfs
+OVERLAYFS_WRITABLE_PATHS[state] = "${localstatedir}/lib"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 do_install[depends] += "u-boot-imx:do_deploy"
-SYSTEMD_SERVICE:${PN} = "data.mount persistent.mount raven-update-confirm.service"
-FILES:${PN} += "${systemd_system_unitdir}"
-RDEPENDS:${PN} = "libubootenv-bin util-linux-findmnt wpa-supplicant"
+SYSTEMD_SERVICE:${PN} = "data.mount overlay.mount persistent.mount raven-update-confirm.service"
+FILES:${PN} += "${systemd_system_unitdir} /overlay"
+RDEPENDS:${PN} = "kernel-module-overlay libubootenv-bin util-linux-findmnt wpa-supplicant"
 COMPATIBLE_MACHINE = "raven-frdm-imx95"
 
 do_install() {
@@ -34,10 +36,15 @@ do_install() {
     ln -s ../wpa_supplicant@.service ${D}${systemd_system_unitdir}/multi-user.target.wants/wpa_supplicant@mlan0.service
     install -m 0644 ${UNPACKDIR}/persistent.mount ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/data.mount ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/overlay.mount ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/raven-overlay-prepare.service ${D}${systemd_system_unitdir}/
+    install -d ${D}/overlay ${D}${localstatedir}/lib ${D}${systemd_system_unitdir}/var-lib.mount.d
+    install -m 0644 ${UNPACKDIR}/var-lib.conf ${D}${systemd_system_unitdir}/var-lib.mount.d/10-raven.conf
     install -m 0644 ${UNPACKDIR}/raven-update-confirm.service ${D}${systemd_system_unitdir}/
     install -d ${D}${systemd_system_unitdir}/swupdate.service.d
     install -m 0644 ${UNPACKDIR}/raven.conf ${D}${systemd_system_unitdir}/swupdate.service.d/
     install -d ${D}${sysconfdir}/systemd/network ${D}${libexecdir}
     install -m 0644 ${UNPACKDIR}/80-raven-wifi.network ${D}${sysconfdir}/systemd/network/
     install -m 0755 ${UNPACKDIR}/raven-update-confirm ${D}${libexecdir}/
+    install -m 0755 ${UNPACKDIR}/raven-overlay-prepare ${D}${libexecdir}/
 }
