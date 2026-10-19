@@ -9,7 +9,7 @@ SRCREV_FORMAT:raven-frdm-imx95 = "default_imx477"
 IMX477_SOURCE:raven-frdm-imx95 = "${UNPACKDIR}/imx477/i.MX95-15x15-FRDM-LPDDR4x"
 
 # Works with both the kernel's shell patch task and userspace's Python patch task.
-# nooelint: oelint.vars.noncoreoverride Hook is dispatched only for Raven FRDM by the prefunc condition below.
+# nooelint: oelint.vars.noncoreoverride Hook runs only when the machine-specific camera pack is configured.
 python raven_imx477_sources() {
     import shutil
     for entry in d.getVar("IMX477_STAGE_FILES").split():
@@ -18,4 +18,4 @@ python raven_imx477_sources() {
                         d.getVar("S") + "/" + target)
 }
 raven_imx477_sources[doc] = "Stage the pinned NXP IMX477 sensor helper and tuning files before patching"
-do_patch[prefuncs] += " ${@'raven_imx477_sources' if d.getVar('MACHINE') == 'raven-frdm-imx95' else ''}"
+do_patch[prefuncs] += " ${@'raven_imx477_sources' if d.getVar('IMX477_SOURCE') else ''}"

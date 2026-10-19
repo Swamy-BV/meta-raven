@@ -14,5 +14,4 @@ IMX477_STAGE_FILES:raven-frdm-imx95 = "\
 "
 
 # Keep NXP's Neo ISP pipeline and IPA; enable only the headless GStreamer adapter.
-PACKAGECONFIG:remove:raven = "dng kms python pycamera opengl sdl"
-PACKAGECONFIG:append:raven = " gst"
+PACKAGECONFIG:raven = "gst"
