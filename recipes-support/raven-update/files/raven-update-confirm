@@ -10,7 +10,38 @@ esac
     echo "Raven: running root filesystem differs from selected boot slot" >&2
     exit 1
 }
-[ "$(fw_printenv -n upgrade_available 2>/dev/null || true)" = 1 ] || exit 0
+pending=$(fw_printenv -n upgrade_available 2>/dev/null || true)
+state=$(fw_printenv -n ustate 2>/dev/null || true)
+# Also finish confirmation of older installations which cleared only bootcount.
+[ "$pending" = 1 ] || [ "$state" = 1 ] || exit 0
+[ -z "$(fw_printenv -n recovery_status 2>/dev/null || true)" ] || {
+    echo "Raven: refusing to confirm an incomplete update transaction" >&2
+    exit 1
+}
+case ",$(findmnt -rn -o OPTIONS /)," in
+    *,ro,*) ;;
+    *) echo "Raven: refusing to confirm a writable root filesystem" >&2; exit 1 ;;
+esac
+for mount in /data /overlay /persistent /var/lib; do
+    findmnt -rn -M "$mount" >/dev/null || {
+        echo "Raven: required writable mount is missing: $mount" >&2
+        exit 1
+    }
+    case ",$(findmnt -rn -M "$mount" -o OPTIONS)," in
+        *,rw,*) ;;
+        *) echo "Raven: required state mount is read-only: $mount" >&2; exit 1 ;;
+    esac
+done
+for unit in px4-dds-agent.service mavlink-router.service; do
+    systemctl is-active --quiet "$unit" || {
+        echo "Raven: required runtime service is not active: $unit" >&2
+        exit 1
+    }
+done
+if [ ! -c /dev/ttyros ] || [ ! -c /dev/ttyproxy ]; then
+    echo "Raven: PX4 communication devices are missing" >&2
+    exit 1
+fi
 # libubootenv accepts multiple key/value pairs and stores them in one transaction.
 fw_setenv upgrade_available 0 bootcount 0 ustate 0
 for name in upgrade_available bootcount ustate; do

@@ -1,0 +1,58 @@
+From: Raven Project <raven@local>
+Subject: [PATCH] arm64: dts: keep Raven ownership and IMX477 in Raven trees
+Upstream-Status: Inappropriate [embedded specific]
+
+Apply the validated M7 exclusions only to the Raven board. Reuse the pinned
+NXP IMX477 overlay on the Raven base, leaving official FRDM variants unchanged.
+
+diff --git a/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts b/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts
+--- a/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts
++++ b/arch/arm64/boot/dts/freescale/raven-frdm-imx95.dts
+@@ -5,3 +5,36 @@
+ 	model = "Raven development platform on NXP FRDM-IMX95";
+ 	compatible = "raven,frdm-imx95", "fsl,frdm-imx95", "fsl,imx95";
+ };
++
++/* Match Raven SM ownership; Linux must not touch M7 peripherals or DMA. */
++&gpio2 {
++	status = "disabled";
++};
++
++&adc1 {
++	status = "disabled";
++};
++
++&lpspi3 {
++	status = "disabled";
++};
++
++&flexcan1 {
++	status = "disabled";
++};
++
++&flexcan2 {
++	status = "disabled";
++};
++
++&flexcan5 {
++	status = "disabled";
++};
++
++&tpm1 {
++	status = "disabled";
++};
++
++&edma2 {
++	dma-channel-mask = <0x00000003 0xffffffff>;
++};
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1587,3 +1587,7 @@
+ 			  imx8qm-mek-revd-sof-wm8962.dtb imx8qm-mek-sof.dtb
+ 
+ dtb-$(CONFIG_ARCH_MXC) += raven-frdm-imx95.dtb
++
++raven-frdm-imx95-imx477-isp-dtbs := raven-frdm-imx95.dtb \
++					imx95-15x15-frdm-imx477.dtbo
++dtb-$(CONFIG_ARCH_MXC) += raven-frdm-imx95-imx477-isp.dtb

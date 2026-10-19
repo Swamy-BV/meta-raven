@@ -1,0 +1,189 @@
+From: Raven Project <raven@local>
+Subject: [PATCH] raven: isolate A/B policy and M7 ownership
+Upstream-Status: Inappropriate [embedded specific]
+
+Keep executable boot policy in the Raven text environment. Preserve the validated
+DDR SPL placement and M7 exclusions without changing NXP board implementations.
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -1076,5 +1076,6 @@
+ libs-$(CONFIG_API) += api/
+ libs-$(HAVE_VENDOR_COMMON_LIB) += board/$(VENDOR)/common/
++libs-$(CONFIG_TARGET_RAVEN_FRDM_IMX95) += board/nxp/common/
+ libs-y += boot/
+ libs-$(CONFIG_CMDLINE) += cmd/
+ libs-y += common/
+
+diff --git a/configs/raven_frdm_imx95_defconfig b/configs/raven_frdm_imx95_defconfig
+--- a/configs/raven_frdm_imx95_defconfig
++++ b/configs/raven_frdm_imx95_defconfig
+@@ -11,6 +11,8 @@
+ CONFIG_SF_DEFAULT_SPEED=40000000
+ CONFIG_ENV_SIZE=0x4000
+ CONFIG_ENV_OFFSET=0x700000
++CONFIG_ENV_REDUNDANT=y
++CONFIG_ENV_OFFSET_REDUND=0x704000
+ CONFIG_ENV_SECT_SIZE=0x10000
+ CONFIG_IMX_CONFIG="arch/arm/mach-imx/imx9/imximage.cfg"
+ CONFIG_DM_GPIO=y
+@@ -23,11 +25,7 @@
+ CONFIG_SPL_SERIAL=y
+ CONFIG_SPL_DRIVERS_MISC=y
+ CONFIG_SPL_HAVE_INIT_STACK=y
+-CONFIG_SPL_STACK=0x204d6000
+-CONFIG_SPL_TEXT_BASE=0x20480000
+ CONFIG_SPL_HAS_BSS_LINKER_SECTION=y
+-CONFIG_SPL_BSS_START_ADDR=0x204d6000
+-CONFIG_SPL_BSS_MAX_SIZE=0x2000
+ CONFIG_SYS_LOAD_ADDR=0x90400000
+ CONFIG_SPL=y
+ CONFIG_SPL_RECOVER_DATA_SECTION=y
+@@ -38,7 +36,6 @@
+ CONFIG_FIT=y
+ CONFIG_FIT_VERBOSE=y
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_BOOTCOMMAND="run sr_ir_v2_cmd; bootflow scan -lb; run bsp_bootcmd"
+ CONFIG_DEFAULT_FDT_FILE="imx95-15x15-frdm.dtb"
+ CONFIG_SYS_CBSIZE=2048
+ CONFIG_SYS_PBSIZE=2074
+@@ -271,3 +268,11 @@
+ CONFIG_SPL_MISC=y
+ CONFIG_SPL_PHY=y
+ CONFIG_SPL_PHY_IMX8MQ_USB=y
++
++# CONFIG_USE_BOOTCOMMAND is not set
++CONFIG_BOOTCOUNT_LIMIT=y
++CONFIG_BOOTCOUNT_ENV=y
++CONFIG_SPL_TEXT_BASE=0x88240000
++CONFIG_SPL_STACK=0x88296000
++CONFIG_SPL_BSS_START_ADDR=0x88296000
++CONFIG_SPL_BSS_MAX_SIZE=0x2000
+diff --git a/board/raven/raven_frdm_imx95/raven_frdm_imx95.env b/board/raven/raven_frdm_imx95/raven_frdm_imx95.env
+--- a/board/raven/raven_frdm_imx95/raven_frdm_imx95.env
++++ b/board/raven/raven_frdm_imx95/raven_frdm_imx95.env
+@@ -76,7 +76,7 @@
+ bootm_size=0x10000000
+ mmcdev=CONFIG_ENV_MMC_DEVICE_INDEX
+ mmcpart=1
+-mmcroot=/dev/mmcblk1p2 rootwait rw
++mmcroot=/dev/mmcblk1p2 rootwait ro
+ mmcautodetect=yes
+ mmcargs=setenv bootargs ${jh_clk} ${mcore_args} console=${console} root=${mmcroot}
+ prepare_mcore=setenv mcore_args pd_ignore_unused;
+@@ -126,7 +126,8 @@
+ 				fi;
+ 			fi;
+ 		fi;
+-bsp_bootcmd=echo Running BSP bootcmd ...;
++bsp_bootcmd=echo Running Raven A/B bootcmd ...;
++	if run adjustbootsource; then
+ 			mmc dev ${mmcdev}; if mmc rescan; then
+ 			if run loadbootscript; then
+ 				run bootscript;
+@@ -144,5 +145,35 @@
+ 				fi;
+ 			fi;
+ 		fi;
++	fi
+ 
+ #endif
++
++/* Raven A/B policy. Keep the Linux DT filename compatible with older slots. */
++bootslot=dualA
++bootlimit=3
++upgrade_available=0
++bootcount=0
++ustate=0
++adjustbootsource=if test ${bootslot} = dualA; then
++	setenv mmcpart 1; setenv mmcroot /dev/mmcblk${mmcdev}p2 rootwait ro;
++	elif test ${bootslot} = dualB; then
++	setenv mmcpart 3; setenv mmcroot /dev/mmcblk${mmcdev}p4 rootwait ro;
++	else
++	echo Invalid Raven boot slot; false;
++	fi
++altbootcmd=if test ${upgrade_available} = 1; then
++	if test ${bootslot} = dualA; then
++		setenv bootslot dualB;
++	elif test ${bootslot} = dualB; then
++		setenv bootslot dualA;
++	else
++		echo Invalid Raven rollback slot; exit;
++	fi;
++	setenv upgrade_available 0; setenv bootcount 0; setenv ustate 3;
++	if saveenv; then run bootcmd; else echo Cannot save Raven rollback; false; fi;
++	else
++	echo No pending Raven update to roll back; false;
++	fi
++
++bootcmd=run sr_ir_v2_cmd; run bsp_bootcmd
+diff --git a/board/raven/raven_frdm_imx95/raven_frdm_imx95.c b/board/raven/raven_frdm_imx95/raven_frdm_imx95.c
+--- a/board/raven/raven_frdm_imx95/raven_frdm_imx95.c
++++ b/board/raven/raven_frdm_imx95/raven_frdm_imx95.c
+@@ -14,7 +14,7 @@
+ #include <fdt_support.h>
+ #include <asm/arch/clock.h>
+ #include <usb.h>
+-#include "../common/tcpc.h"
++#include "../../nxp/common/tcpc.h"
+ #include <dwc3-uboot.h>
+ #include <linux/bitfield.h>
+ #include <linux/bitops.h>
+@@ -210,6 +210,11 @@
+ #else
+ 		/* Enable EXT PWR */
+ 		ret = get_board_version(rev, data);
++		if (ret) {
++			printf("%s: board revision unavailable; skip EXT PWR setup\n",
++			       __func__);
++			return;
++		}
+ 		if (ret == 0) {
+ 			if (rev[0] < 2) {
+ 				ret = dm_gpio_lookup_name("GPIO5_9", &ext_pwr_desc);
+diff --git a/arch/arm/dts/raven-frdm-imx95-u-boot.dtsi b/arch/arm/dts/raven-frdm-imx95-u-boot.dtsi
+--- a/arch/arm/dts/raven-frdm-imx95-u-boot.dtsi
++++ b/arch/arm/dts/raven-frdm-imx95-u-boot.dtsi
+@@ -1,2 +1,11 @@
+ // SPDX-License-Identifier: GPL-2.0+
+ #include "imx95-15x15-frdm-u-boot.dtsi"
++
++/* The Raven System Manager assigns these blocks to M7. */
++&gpio2 {
++	status = "disabled";
++};
++
++&adc1 {
++	status = "disabled";
++};
+diff --git a/arch/arm/mach-imx/imx9/scmi/soc.c b/arch/arm/mach-imx/imx9/scmi/soc.c
+--- a/arch/arm/mach-imx/imx9/scmi/soc.c
++++ b/arch/arm/mach-imx/imx9/scmi/soc.c
+@@ -428,6 +428,16 @@
+ 		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+ 			 PTE_BLOCK_NON_SHARE |
+ 			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
++	},
++#endif
++#if IS_ENABLED(CONFIG_XPL_BUILD) && defined(CONFIG_TARGET_RAVEN_FRDM_IMX95)
++	{
++		/* Raven's DDR SPL and stack precede the A55 DRAM window. */
++		.virt = 0x88000000UL,
++		.phys = 0x88000000UL,
++		.size = 0x02000000UL,
++		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
++			 PTE_BLOCK_OUTER_SHARE
+ 	},
+ #endif
+ #if IS_ENABLED(CONFIG_XPL_BUILD)
+@@ -2037,7 +2047,8 @@
+ 		disable_wdog((void __iomem *)WDG3_BASE_ADDR);
+ 		disable_wdog((void __iomem *)WDG4_BASE_ADDR);
+ 
+-		if (gpio_available("/soc/gpio@43810000"))
++		if (!IS_ENABLED(CONFIG_TARGET_RAVEN_FRDM_IMX95) &&
++		    gpio_available("/soc/gpio@43810000"))
+ 			gpio_reset(GPIO2_BASE_ADDR);
+ 
+ 		gpio_reset(GPIO3_BASE_ADDR);

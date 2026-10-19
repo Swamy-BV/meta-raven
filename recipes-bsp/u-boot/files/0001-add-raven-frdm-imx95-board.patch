@@ -1,6 +1,6 @@
 From: Raven Project <raven@local>
 Subject: [PATCH] board: add isolated Raven FRDM-IMX95 baseline
-Upstream-Status: Inappropriate [Raven board integration]
+Upstream-Status: Inappropriate [embedded specific]
 
 Copy the board implementation and defconfig from NXP bb41975aeb4cbd153b49c9fd62da1d64cd65968d.
 Retain NXP licensing and hardware defaults; register a separate target and DT.

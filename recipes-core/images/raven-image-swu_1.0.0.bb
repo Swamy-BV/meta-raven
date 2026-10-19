@@ -17,8 +17,8 @@ RAVEN_IMX_BOOT_IMAGE = "imx-boot-${MACHINE}-${UBOOT_CONFIG}.bin-${IMXBOOT_TARGET
 RAVEN_IMX_BOOT_OFFSET = "${@str(int(d.getVar('IMX_BOOT_SEEK')) * 1024)}"
 RAVEN_IMX_BOOT_LIMIT = "7340032"
 IMAGE_DEPENDS = "raven-image"
-do_swuimage[depends] += "virtual/kernel:do_deploy imx-boot:do_deploy"
-SWUPDATE_IMAGES = "raven-image Image ${RAVEN_CAMERA_DTB} ${RAVEN_IMX_BOOT_IMAGE}"
+do_swuimage[depends] += "virtual/kernel:do_deploy imx-boot:do_deploy u-boot-imx:do_deploy"
+SWUPDATE_IMAGES = "raven-image Image ${RAVEN_CAMERA_DTB} ${RAVEN_IMX_BOOT_IMAGE} raven-boot.env"
 SWUPDATE_IMAGES_FSTYPES[raven-image] = ".rootfs.ext4.gz"
 
 COMPATIBLE_MACHINE = "raven-frdm-imx95"

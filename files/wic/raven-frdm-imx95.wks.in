@@ -9,7 +9,7 @@ part u-boot --source rawcopy --sourceparams="file=imx-boot.tagged" --ondisk mmcb
 # Both slots start with the same kernel, device trees, Raven PX4 M7 firmware,
 # and rootfs.
 # Keep boot_a at p1 and rootfs_a at p2 so NXP's initial U-Boot defaults boot A.
-# Boot selection and rollback for slot B require separate U-Boot changes.
+# Raven's U-Boot environment owns slot selection and rollback.
 part /boot --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_a --part-name boot_a --active --align 8192 --fixed-size 512
 part / --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_a --part-name rootfs_a --align 8192 --fixed-size ${RAVEN_ROOTFS_SIZE_MIB}
 part --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot_b --part-name boot_b --align 8192 --fixed-size 512

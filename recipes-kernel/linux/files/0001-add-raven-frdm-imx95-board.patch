@@ -1,6 +1,6 @@
 From: Raven Project <raven@local>
 Subject: [PATCH] arm64: dts: add isolated Raven FRDM-IMX95 baseline
-Upstream-Status: Inappropriate [Raven board integration]
+Upstream-Status: Inappropriate [embedded specific]
 
 Inherit the NXP FRDM hardware description without modifying the official board.
 

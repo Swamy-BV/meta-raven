@@ -1,6 +1,8 @@
 [Unit]
-Description=Confirm Raven Linux update after reaching userspace
-After=local-fs.target systemd-udev-settle.service
+Description=Confirm Raven Linux update after storage and PX4 links start
+Requires=data.mount overlay.mount persistent.mount var-lib.mount
+Wants=px4-dds-agent.service mavlink-router.service
+After=data.mount overlay.mount persistent.mount var-lib.mount px4-dds-agent.service mavlink-router.service
 Before=swupdate.service
 
 [Service]

@@ -60,6 +60,7 @@ software = {
                     type = "raw";
                     compressed = "zlib";
                     device = "/dev/disk/by-partlabel/rootfs_a";
+                    installed-directly = true;
                     hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
                 },
@@ -70,6 +71,12 @@ software = {
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
                     hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                },
+                {
+                    filename = "raven-boot.env";
+                    type = "bootloader";
+                    hook = "guard_a";
+                    sha256 = "$swupdate_get_sha256(raven-boot.env)";
                 }
             );
             scripts: (
@@ -115,6 +122,7 @@ software = {
                     type = "raw";
                     compressed = "zlib";
                     device = "/dev/disk/by-partlabel/rootfs_b";
+                    installed-directly = true;
                     hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
                 },
@@ -125,6 +133,12 @@ software = {
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
                     hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                },
+                {
+                    filename = "raven-boot.env";
+                    type = "bootloader";
+                    hook = "guard_b";
+                    sha256 = "$swupdate_get_sha256(raven-boot.env)";
                 }
             );
             scripts: (
