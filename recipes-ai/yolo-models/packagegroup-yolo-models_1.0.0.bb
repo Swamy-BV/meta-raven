@@ -11,11 +11,11 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c5
 inherit packagegroup
 
 RDEPENDS:${PN} = "\
-    model-runner \
     model-yolo-labels \
     model-yolov4-tiny \
     model-yolov6-nano \
     model-yolov7 \
     model-yolox-nano \
     model-yolox-tiny \
+    vision-engine \
 "

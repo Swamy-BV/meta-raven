@@ -17,7 +17,7 @@ S = "${UNPACKDIR}"
 inherit allarch
 
 do_install() {
-    install -D -m 0644 ${S}/yolo-labels-${PV}.txt ${D}${datadir}/model-runner/models/yolo-labels.txt
-    install -D -m 0644 ${S}/yolo-labels-${PV}-LICENSE ${D}${datadir}/model-runner/licenses/${PN}/LICENSE
+    install -D -m 0644 ${S}/yolo-labels-${PV}.txt ${D}${datadir}/vision-engine/models/yolo-labels.txt
+    install -D -m 0644 ${S}/yolo-labels-${PV}-LICENSE ${D}${datadir}/vision-engine/licenses/${PN}/LICENSE
 }
-FILES:${PN} += "${datadir}/model-runner"
+FILES:${PN} += "${datadir}/vision-engine"

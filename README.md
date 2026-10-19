@@ -23,25 +23,20 @@ physical flight with real sensors and actuators remains to be validated.
   offboard flight exercised translation, climb, yaw and return setpoints before
   landing. ROS telemetry and command acknowledgements were observed throughout.
 - **Updates without reflashing:** SWUpdate provides web uploads, A/B Linux
-  updates and verified writes of the shared i.MX boot container. Slot switching
+  updates and raw writes of the shared i.MX boot container. Slot switching
   and automatic reboot have been tested on hardware.
 - **Media capture:** The ROS 2 camera node separates source adapters, capture
   sessions, photos, recording and preview. IMX477 3840 x 2160 JPEG capture and
   hardware-encoded 1280 x 720 browser video have been tested. ROS images and
   CameraInfo share frame timestamps. Photo sequences, recording controls and
   camera commands from a laptop and PX4 M7 use the same ROS operations.
-- **Model execution:** `model-runner` supports model selection and isolated
-  TensorFlow Lite / ONNX inference. Neutron NPU object detection has been exercised;
-  acceleration depends on the model and supported operators.
-- **ROS perception interfaces:** `perception-hub` translates inference results
-  into standard ROS vision messages, with model metadata and pipeline health.
+- **Vision inference:** `vision-engine` combines model selection, isolated
+  TensorFlow Lite / ONNX inference and standard ROS vision outputs. Neutron NPU
+  object detection has been exercised; acceleration depends on supported operators.
+  Capture, recording and flight control remain separate components.
 - **Generative AI exploration:** On-board text generation and image question/
   answer experiments have produced responses. These remain experiments; VLM
   execution has required CPU fallback and is not a validated NPU-only pipeline.
-
-The bench runs SIH firmware on M7 and Yocto-built camera packages on Linux.
-Camera controls and streaming are tested through package deployment; the full
-SWUpdate bundle has not been installed in this bench configuration.
 
 ## Components
 
@@ -54,19 +49,17 @@ flowchart LR
         media[media-capture]
         camera[camera-mavlink]
         video[MediaMTX]
-        runner[model-runner]
-        perception[perception-hub]
+        vision[vision-engine]
         agent[Micro XRCE-DDS Agent]
         router[mavlink-router]
         camera <-->|ROS controls / state / capture events| media
         camera <-->|Camera MAVLink| router
         media -->|H.264 RTP| video
-        media -->|ROS Image| runner
-        perception <-->|Inference requests / results| runner
+        media -->|ROS Image| vision
     end
     video -->|WebRTC| browser[Browser preview]
     media <-->|Image / CameraInfo / services / actions| ros[ROS applications]
-    perception -->|ROS vision / metadata / health| ros
+    vision -->|ROS vision / metadata / health| ros
     px4[PX4 on M7] <-->|uXRCE-DDS over RPMsg ttyros| agent
     agent <-->|ROS px4_msgs / fmu topics| ros
     px4 <-->|MAVLink over RPMsg ttyproxy| router

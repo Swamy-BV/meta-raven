@@ -33,13 +33,12 @@ IMAGE_INSTALL:append = " \
     micro-xrce-dds-agent \
     mavlink-router \
     px4-msgs \
-    perception-hub \
     media-capture \
     camera-mavlink \
     mediamtx \
     neo-ipa-uguzzi \
     kernel-module-imx477 \
-    model-runner \
+    vision-engine \
 "
 
 # Publish a block map with the compressed factory WIC for bmaptool and UUU.

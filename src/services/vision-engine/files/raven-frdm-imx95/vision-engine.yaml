@@ -1,0 +1,8 @@
+/raven/vehicle_1/perception/vision_engine:
+  ros__parameters:
+    camera_topic: /raven/vehicle_1/cameras/front/image_raw
+    config_file: /etc/vision-engine.conf
+    default_model: yolov4-tiny-neutron
+    auto_infer: true
+    max_result_age_ms: 1000
+    frame_id: camera_optical_frame

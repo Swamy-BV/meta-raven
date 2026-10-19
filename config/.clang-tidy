@@ -112,6 +112,3 @@ CheckOptions:
   readability-function-size.NestingThreshold: 3
   readability-function-cognitive-complexity.Threshold: 15
   readability-function-cognitive-complexity.IgnoreMacros: true
-
-  # Published contract enum widths are part of the ABI.
-  performance-enum-size.EnumIgnoreList: '^raven::contracts::(ErrorCode|Validity|ArmedState|FlightMode|Permission|CommandState)$'

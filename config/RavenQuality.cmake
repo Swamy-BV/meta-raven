@@ -82,9 +82,8 @@ if(RAVEN_QUALITY_TIDY)
   if(NOT _raven_tidy_result STREQUAL "0")
     message(FATAL_ERROR "Invalid clang-tidy policy: ${_raven_tidy_output}${_raven_tidy_error}")
   endif()
-  set(CMAKE_CXX_CLANG_TIDY
-      "${RAVEN_CLANG_TIDY}" "--config-file=${_raven_config}/.clang-tidy"
-      "--header-filter=^${PROJECT_SOURCE_DIR}/|/(local_ipc|detection)[.]h$|/raven/contracts/" --system-headers)
+  set(CMAKE_CXX_CLANG_TIDY "${RAVEN_CLANG_TIDY}" "--config-file=${_raven_config}/.clang-tidy"
+                           "--header-filter=^${PROJECT_SOURCE_DIR}/|/raven/contracts/" --system-headers)
   list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-Wthread-safety")
   # Clang must see the target GCC's standard library, not the host's headers.
   foreach(dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)

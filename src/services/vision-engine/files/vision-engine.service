@@ -1,0 +1,45 @@
+[Unit]
+Description=Camera inference and ROS vision outputs
+After=local-fs.target media-capture.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=vision-engine
+Group=vision-engine
+SupplementaryGroups=video
+LogsDirectory=vision-engine
+Environment=ROS_LOG_DIR=/var/log/vision-engine
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ExecStart=@ROS_PREFIX@/lib/vision_engine/vision-engine --ros-args --params-file /etc/vision-engine.yaml
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+UMask=0077
+RuntimeDirectory=vision-engine
+RuntimeDirectoryMode=0750
+StateDirectory=vision-engine
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+DevicePolicy=closed
+DeviceAllow=/dev/neutron0 rw
+ReadWritePaths=-/run/lock/neutron.lock
+MemoryMax=512M
+TasksMax=64
+CPUQuota=200%
+Environment=OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2
+
+[Install]
+WantedBy=multi-user.target

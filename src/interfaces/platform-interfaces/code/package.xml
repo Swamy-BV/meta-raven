@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>raven_interfaces</name>
+  <version>1.0.0</version>
+  <description>Raven service interface definitions.</description>
+  <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
+  <license>AGPL-3.0-only</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <depend>action_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
