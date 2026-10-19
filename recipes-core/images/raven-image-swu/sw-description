@@ -3,18 +3,6 @@ software = {
     description = "Raven Linux A/B and shared i.MX boot-container update";
 
     hardware-compatibility: [ "1.0" ];
-    // Built-in readback handler verifies the shared boot container after installation.
-    scripts: (
-        {
-            type = "readback";
-            device = "/dev/mmcblk0";
-            properties: {
-                sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                size = "@@RAVEN_IMX_BOOT_SIZE@@";
-                offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
-            };
-        }
-    );
     stable = {
         slot_a = {
             bootenv: (

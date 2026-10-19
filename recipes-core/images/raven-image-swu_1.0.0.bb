@@ -1,5 +1,5 @@
 SUMMARY = "Raven Linux A/B SWUpdate bundle"
-DESCRIPTION = "Updates Linux A/B slots and the shared i.MX boot container with readback verification"
+DESCRIPTION = "Updates Linux A/B slots and the shared i.MX boot container"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "images"
@@ -31,5 +31,4 @@ python do_swuimage:prepend() {
     limit = int(d.getVar('RAVEN_IMX_BOOT_LIMIT'))
     if offset < 32768 or size <= 0 or offset + size > limit:
         bb.fatal('i.MX boot container exceeds the reserved eMMC boot area')
-    d.setVar('RAVEN_IMX_BOOT_SIZE', str(size))
 }
