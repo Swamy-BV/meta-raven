@@ -26,7 +26,9 @@ IMAGE_INSTALL:append = " \
     swupdate \
     swupdate-www \
     libubootenv-bin \
+    raven-storage \
     raven-update-config \
+    wpa-supplicant \
     kernel-module-rpmsg-tty2 \
     micro-xrce-dds-agent \
     mavlink-router \
