@@ -11,9 +11,7 @@ esac
     exit 1
 }
 pending=$(fw_printenv -n upgrade_available 2>/dev/null || true)
-state=$(fw_printenv -n ustate 2>/dev/null || true)
-# Also finish confirmation of older installations which cleared only bootcount.
-[ "$pending" = 1 ] || [ "$state" = 1 ] || exit 0
+[ "$pending" = 1 ] || exit 0
 [ -z "$(fw_printenv -n recovery_status 2>/dev/null || true)" ] || {
     echo "Raven: refusing to confirm an incomplete update transaction" >&2
     exit 1

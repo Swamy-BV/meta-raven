@@ -17,7 +17,7 @@ inherit overlayfs
 OVERLAYFS_WRITABLE_PATHS[state] = "${localstatedir}/lib"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 SYSTEMD_SERVICE:${PN} = "data.mount overlay.mount persistent.mount raven-update-confirm.service"
-FILES:${PN} += "${systemd_system_unitdir} /overlay"
+FILES:${PN} += "${systemd_system_unitdir} /data /overlay /persistent"
 RDEPENDS:${PN} = "kernel-module-overlay libubootenv-bin mavlink-router micro-xrce-dds-agent \
                   u-boot-imx-env util-linux-findmnt wpa-supplicant"
 COMPATIBLE_MACHINE = "raven-frdm-imx95"
@@ -35,7 +35,8 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/data.mount ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/overlay.mount ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/raven-overlay-prepare.service ${D}${systemd_system_unitdir}/
-    install -d ${D}/overlay ${D}${localstatedir}/lib ${D}${systemd_system_unitdir}/var-lib.mount.d
+    install -d ${D}/data ${D}/overlay ${D}/persistent ${D}${localstatedir}/lib
+    install -d ${D}${systemd_system_unitdir}/var-lib.mount.d
     install -m 0644 ${UNPACKDIR}/var-lib.conf ${D}${systemd_system_unitdir}/var-lib.mount.d/10-raven.conf
     install -m 0644 ${UNPACKDIR}/raven-update-confirm.service ${D}${systemd_system_unitdir}/
     install -d ${D}${systemd_system_unitdir}/swupdate.service.d

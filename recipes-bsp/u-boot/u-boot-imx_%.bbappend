@@ -9,11 +9,3 @@ SRC_URI:append:raven-frdm-imx95 = " \
 
 # Standard U-Boot environment package; both libubootenv and SWUpdate use this name.
 UBOOT_INITIAL_ENV:raven-frdm-imx95 = "u-boot-initial-env"
-
-# Export only managed boot scripts, never device identity or the current slot.
-# SWUpdate's standard bootloader handler merges these after payload verification.
-do_deploy:append:raven-frdm-imx95() {
-    sed -n -E '/^(adjustbootsource|altbootcmd|bootcmd|bootlimit|bsp_bootcmd)=.+/p' \
-        ${DEPLOYDIR}/${UBOOT_INITIAL_ENV}-${MACHINE}-${UBOOT_CONFIG} > ${DEPLOYDIR}/raven-boot.env
-    test "$(wc -l < ${DEPLOYDIR}/raven-boot.env)" -eq 5 || bbfatal "Incomplete Raven boot environment"
-}

@@ -47,7 +47,7 @@ software = {
                 },
                 {
                     filename = "@@RAVEN_CAMERA_DTB@@";
-                    path = "/imx95-15x15-frdm.dtb";
+                    path = "/@@RAVEN_CAMERA_DTB@@";
                     device = "/dev/disk/by-partlabel/boot_a";
                     hook = "guard_a";
                     filesystem = "vfat";
@@ -71,12 +71,6 @@ software = {
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
                     hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                },
-                {
-                    filename = "raven-boot.env";
-                    type = "bootloader";
-                    hook = "guard_a";
-                    sha256 = "$swupdate_get_sha256(raven-boot.env)";
                 }
             );
             scripts: (
@@ -109,7 +103,7 @@ software = {
                 },
                 {
                     filename = "@@RAVEN_CAMERA_DTB@@";
-                    path = "/imx95-15x15-frdm.dtb";
+                    path = "/@@RAVEN_CAMERA_DTB@@";
                     device = "/dev/disk/by-partlabel/boot_b";
                     hook = "guard_b";
                     filesystem = "vfat";
@@ -133,12 +127,6 @@ software = {
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
                     hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                },
-                {
-                    filename = "raven-boot.env";
-                    type = "bootloader";
-                    hook = "guard_b";
-                    sha256 = "$swupdate_get_sha256(raven-boot.env)";
                 }
             );
             scripts: (

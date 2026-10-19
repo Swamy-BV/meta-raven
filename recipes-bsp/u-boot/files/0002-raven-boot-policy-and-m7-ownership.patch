@@ -40,14 +40,16 @@ diff --git a/configs/raven_frdm_imx95_defconfig b/configs/raven_frdm_imx95_defco
  CONFIG_SYS_LOAD_ADDR=0x90400000
  CONFIG_SPL=y
  CONFIG_SPL_RECOVER_DATA_SECTION=y
-@@ -38,7 +36,6 @@
+@@ -38,8 +36,7 @@
  CONFIG_FIT=y
  CONFIG_FIT_VERBOSE=y
  CONFIG_OF_SYSTEM_SETUP=y
 -CONFIG_BOOTCOMMAND="run sr_ir_v2_cmd; bootflow scan -lb; run bsp_bootcmd"
- CONFIG_DEFAULT_FDT_FILE="imx95-15x15-frdm.dtb"
+-CONFIG_DEFAULT_FDT_FILE="imx95-15x15-frdm.dtb"
++CONFIG_DEFAULT_FDT_FILE="raven-frdm-imx95-imx477-isp.dtb"
  CONFIG_SYS_CBSIZE=2048
  CONFIG_SYS_PBSIZE=2074
+ CONFIG_ARCH_MISC_INIT=y
 @@ -271,3 +268,11 @@
  CONFIG_SPL_MISC=y
  CONFIG_SPL_PHY=y
@@ -90,7 +92,7 @@ diff --git a/board/raven/raven_frdm_imx95/raven_frdm_imx95.env b/board/raven/rav
  
  #endif
 +
-+/* Raven A/B policy. Keep the Linux DT filename compatible with older slots. */
++/* Raven A/B policy. */
 +bootslot=dualA
 +bootlimit=3
 +upgrade_available=0

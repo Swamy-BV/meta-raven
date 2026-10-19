@@ -1,16 +1,20 @@
 # Loaded by the upstream SWUpdate launcher after its Mongoose configuration.
-rootdev=$(findmnt -rn -o MAJ:MIN /) || exit 1
-case "$rootdev" in
-    "$(cat /sys/class/block/mmcblk0p2/dev)") update_slot=slot_b ;;
-    "$(cat /sys/class/block/mmcblk0p4/dev)") update_slot=slot_a ;;
-    *) echo "Raven: refusing updates from unknown root filesystem" >&2; exit 1 ;;
+bootslot=$(fw_printenv -n bootslot) || exit 1
+case "$bootslot" in
+    dualA) running_root=mmcblk0p2; update_slot=slot_b ;;
+    dualB) running_root=mmcblk0p4; update_slot=slot_a ;;
+    *) echo "Raven: refusing update with an invalid boot slot" >&2; exit 1 ;;
 esac
+rootdev=$(findmnt -rn -o MAJ:MIN /) || exit 1
+[ "$rootdev" = "$(cat /sys/class/block/$running_root/dev)" ] || {
+    echo "Raven: selected slot is not running; reboot before another update" >&2
+    exit 1
+}
 # SWUpdate reports boot-partition index 6 for EXT_CSD user-area boot enable 7.
 # This bundle's raw boot-container target must agree with the ROM boot source.
 [ "$(swupdate --get-emmc-boot /dev/mmcblk0)" = 6 ] || {
     echo "Raven: refusing update outside the validated eMMC user-area boot layout" >&2
     exit 1
 }
-fw_printenv -n bootslot >/dev/null || exit 1
 SWUPDATE_ARGS="$SWUPDATE_ARGS -e stable,$update_slot -p /sbin/reboot"
 SWUPDATE_WEBSERVER_ARGS="$SWUPDATE_WEBSERVER_ARGS -p 8080"
