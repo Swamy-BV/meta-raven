@@ -38,9 +38,8 @@ inherit deploy python3native
 # configure time, when BitBake disables network access.
 export GIT_SUBMODULES_ARE_EVIL = "1"
 
-# PX4 drives Ninja and NuttX's nested Make itself. Avoid passing GNU Make's
-# jobserver through those layers; bound Ninja directly instead.
-PARALLEL_MAKE = ""
+# PX4 drives Ninja and NuttX's nested Make itself. Keep the outer Make serial
+# and pass BitBake's parallelism setting directly to Ninja below.
 # NuttX supplies its own rules; avoid GNU Make implicit-rule searches.
 export MAKEFLAGS = "-r"
 # The selected compiler is GCC; avoid recursive prefix detection in Make.
@@ -66,7 +65,8 @@ do_compile() {
     export GIT_CONFIG_COUNT=1
     export GIT_CONFIG_KEY_0="url.file://${UNPACKDIR}/microcdr.insteadOf"
     export GIT_CONFIG_VALUE_0="https://github.com/eProsima/Micro-CDR.git"
-    oe_runmake -C ${S} BUILD_DIR_SUFFIX=_yocto PX4_MAKE_ARGS=-j8 ${RAVEN_PX4_TARGET}
+    oe_runmake -j1 -C ${S} BUILD_DIR_SUFFIX=_yocto \
+        PX4_MAKE_ARGS="${@oe.utils.parallel_make_argument(d, '-j%d') or '-j1'}" ${RAVEN_PX4_TARGET}
 }
 
 do_install[noexec] = "1"
