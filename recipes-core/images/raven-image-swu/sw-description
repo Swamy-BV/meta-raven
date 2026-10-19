@@ -3,31 +3,18 @@ software = {
     description = "Raven Linux A/B and shared i.MX boot-container update";
 
     hardware-compatibility: [ "1.0" ];
-    embedded-script = "
-        function root_device()
-            local f = io.open('/proc/self/mountinfo', 'r')
-            if not f then return nil end
-            for line in f:lines() do
-                local dev, mount = line:match('^%S+ %S+ (%S+) %S+ (%S+) ')
-                if mount == '/' then f:close(); return dev end
-            end
-            f:close()
-            return nil
-        end
-        function guard(image, expected_root)
-            local f = io.open('/sys/class/block/' .. expected_root .. '/dev', 'r')
-            if not f then return false, image end
-            local expected = f:read('*l')
-            f:close()
-            if root_device() ~= expected then
-                swupdate.error('Refusing update: target is active or running root is unknown')
-                return false, image
-            end
-            return true, image
-        end
-        function guard_a(image) return guard(image, 'mmcblk0p4') end
-        function guard_b(image) return guard(image, 'mmcblk0p2') end
-    ";
+    // Built-in readback handler verifies the shared boot container after installation.
+    scripts: (
+        {
+            type = "readback";
+            device = "/dev/mmcblk0";
+            properties: {
+                sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
+                size = "@@RAVEN_IMX_BOOT_SIZE@@";
+                offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
+            };
+        }
+    );
     stable = {
         slot_a = {
             bootenv: (
@@ -41,7 +28,6 @@ software = {
                     filename = "Image";
                     path = "/Image";
                     device = "/dev/disk/by-partlabel/boot_a";
-                    hook = "guard_a";
                     filesystem = "vfat";
                     sha256 = "$swupdate_get_sha256(Image)";
                 },
@@ -49,7 +35,6 @@ software = {
                     filename = "@@RAVEN_CAMERA_DTB@@";
                     path = "/@@RAVEN_CAMERA_DTB@@";
                     device = "/dev/disk/by-partlabel/boot_a";
-                    hook = "guard_a";
                     filesystem = "vfat";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_CAMERA_DTB@@)";
                 }
@@ -61,7 +46,6 @@ software = {
                     compressed = "zlib";
                     device = "/dev/disk/by-partlabel/rootfs_a";
                     installed-directly = true;
-                    hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
                 },
                 {
@@ -69,19 +53,7 @@ software = {
                     type = "raw";
                     device = "/dev/mmcblk0";
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
-                    hook = "guard_a";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                }
-            );
-            scripts: (
-                {
-                    type = "readback";
-                    device = "/dev/mmcblk0";
-                    properties: {
-                        sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                        size = "@@RAVEN_IMX_BOOT_SIZE@@";
-                        offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
-                    };
                 }
             );
         };
@@ -97,7 +69,6 @@ software = {
                     filename = "Image";
                     path = "/Image";
                     device = "/dev/disk/by-partlabel/boot_b";
-                    hook = "guard_b";
                     filesystem = "vfat";
                     sha256 = "$swupdate_get_sha256(Image)";
                 },
@@ -105,7 +76,6 @@ software = {
                     filename = "@@RAVEN_CAMERA_DTB@@";
                     path = "/@@RAVEN_CAMERA_DTB@@";
                     device = "/dev/disk/by-partlabel/boot_b";
-                    hook = "guard_b";
                     filesystem = "vfat";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_CAMERA_DTB@@)";
                 }
@@ -117,7 +87,6 @@ software = {
                     compressed = "zlib";
                     device = "/dev/disk/by-partlabel/rootfs_b";
                     installed-directly = true;
-                    hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(raven-image-raven-frdm-imx95.rootfs.ext4.gz)";
                 },
                 {
@@ -125,19 +94,7 @@ software = {
                     type = "raw";
                     device = "/dev/mmcblk0";
                     offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
-                    hook = "guard_b";
                     sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                }
-            );
-            scripts: (
-                {
-                    type = "readback";
-                    device = "/dev/mmcblk0";
-                    properties: {
-                        sha256 = "$swupdate_get_sha256(@@RAVEN_IMX_BOOT_IMAGE@@)";
-                        size = "@@RAVEN_IMX_BOOT_SIZE@@";
-                        offset = "@@RAVEN_IMX_BOOT_OFFSET@@";
-                    };
                 }
             );
         };
