@@ -18,7 +18,7 @@ part --source rootfs --ondisk mmcblk --fstype=ext4 --label rootfs_b --part-name 
 # Shared data survives A/B image replacement. Keep format changes compatible
 # with the old slot so rollback can still read it.
 part --ondisk mmcblk --fstype=ext4 --label data --part-name data --align 8192 --fixed-size 4096
-# Keep separate upper/work directories for A and B on the single overlay volume.
+# Shared writable state for both Linux slots.
 part --ondisk mmcblk --fstype=ext4 --label overlay --part-name overlay --align 8192 --fixed-size 512
 # Small shared store for identity, calibration, and other critical settings.
 part --ondisk mmcblk --fstype=ext4 --label persistent --part-name persistent --align 8192 --fixed-size 32

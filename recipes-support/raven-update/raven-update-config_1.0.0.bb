@@ -1,5 +1,5 @@
 SUMMARY = "Raven A/B updates and persistent state"
-DESCRIPTION = "Installs A/B update selection, persistent networking and per-slot writable state on a read-only root"
+DESCRIPTION = "Installs A/B update selection, persistent networking and shared writable state on a read-only root"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "base"
@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c5
 SRC_URI = "file://hwrevision file://persistent.mount file://data.mount \
            file://80-raven-wifi.network file://raven-wifi.conf file://raven-update-confirm \
            file://raven-update-confirm.service file://20-raven-args \
-           file://raven.conf file://overlay.mount file://raven-overlay-prepare \
+           file://raven.conf file://overlay.mount \
            file://raven-overlay-prepare.service file://var-lib.conf"
 S = "${UNPACKDIR}"
 
@@ -23,10 +23,9 @@ RDEPENDS:${PN} = "kernel-module-overlay libubootenv-bin mavlink-router micro-xrc
 COMPATIBLE_MACHINE = "raven-frdm-imx95"
 
 do_install() {
-    install -d ${D}${sysconfdir}/swupdate/conf.d ${D}${sysconfdir}/wpa_supplicant
+    install -d ${D}${sysconfdir}/swupdate/conf.d
     install -m 0644 ${UNPACKDIR}/hwrevision ${D}${sysconfdir}/hwrevision
     install -m 0644 ${UNPACKDIR}/20-raven-args ${D}${sysconfdir}/swupdate/conf.d/
-    ln -s /persistent/wifi/wpa_supplicant-mlan0.conf ${D}${sysconfdir}/wpa_supplicant/wpa_supplicant-mlan0.conf
     install -d ${D}${systemd_system_unitdir}/wpa_supplicant@mlan0.service.d
     install -m 0644 ${UNPACKDIR}/raven-wifi.conf ${D}${systemd_system_unitdir}/wpa_supplicant@mlan0.service.d/
     install -d ${D}${systemd_system_unitdir}/multi-user.target.wants
@@ -36,6 +35,7 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/overlay.mount ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/raven-overlay-prepare.service ${D}${systemd_system_unitdir}/
     install -d ${D}/data ${D}/overlay ${D}/persistent ${D}${localstatedir}/lib
+    install -d -m 0700 ${D}${localstatedir}/lib/wpa_supplicant
     install -d ${D}${systemd_system_unitdir}/var-lib.mount.d
     install -m 0644 ${UNPACKDIR}/var-lib.conf ${D}${systemd_system_unitdir}/var-lib.mount.d/10-raven.conf
     install -m 0644 ${UNPACKDIR}/raven-update-confirm.service ${D}${systemd_system_unitdir}/
@@ -44,5 +44,4 @@ do_install() {
     install -d ${D}${sysconfdir}/systemd/network ${D}${libexecdir}
     install -m 0644 ${UNPACKDIR}/80-raven-wifi.network ${D}${sysconfdir}/systemd/network/
     install -m 0755 ${UNPACKDIR}/raven-update-confirm ${D}${libexecdir}/
-    install -m 0755 ${UNPACKDIR}/raven-overlay-prepare ${D}${libexecdir}/
 }

@@ -1,5 +1,5 @@
 [Unit]
-Description=Select writable state for the running Raven slot
+Description=Prepare shared writable state for both Raven slots
 DefaultDependencies=no
 Requires=overlay.mount
 After=overlay.mount systemd-remount-fs.service
@@ -7,5 +7,5 @@ Before=var-lib.mount
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/raven-overlay-prepare
+ExecStart=/bin/mkdir -p /overlay/upper/var/lib /overlay/workdir/var/lib
 RemainAfterExit=yes
