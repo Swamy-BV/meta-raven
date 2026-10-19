@@ -3,3 +3,6 @@ Name=mlan0
 
 [Network]
 DHCP=yes
+
+[DHCPv4]
+ClientIdentifier=mac
