@@ -1,15 +1,10 @@
 #!/bin/sh
 set -eu
-rootdev=$(findmnt -rn -o MAJ:MIN /)
-case "$rootdev" in
-    "$(cat /sys/class/block/mmcblk0p2/dev)") slot=dualA ;;
-    "$(cat /sys/class/block/mmcblk0p4/dev)") slot=dualB ;;
-    *) echo "Raven: refusing to confirm unknown root filesystem" >&2; exit 1 ;;
+bootslot=$(fw_printenv -n bootslot)
+case "$bootslot" in
+    dualA|dualB) ;;
+    *) echo "Raven: refusing to confirm an invalid boot slot: $bootslot" >&2; exit 1 ;;
 esac
-[ "$(fw_printenv -n bootslot)" = "$slot" ] || {
-    echo "Raven: running root filesystem differs from selected boot slot" >&2
-    exit 1
-}
 pending=$(fw_printenv -n upgrade_available 2>/dev/null || true)
 [ "$pending" = 1 ] || exit 0
 [ -z "$(fw_printenv -n recovery_status 2>/dev/null || true)" ] || {
