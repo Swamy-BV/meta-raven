@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -26,6 +27,8 @@
 namespace raven::tracking {
 namespace {
 constexpr auto kWatchdogMs = 100;
+constexpr double kDefaultInputTimeoutSeconds = 0.75;
+constexpr double kMaxInputTimeoutSeconds = 10.0;
 constexpr auto kOutputDepth = 5;
 constexpr auto kNanosPerSecond = 1000000000LL;
 constexpr auto kFutureToleranceNs = 100000000LL;
@@ -87,6 +90,12 @@ void TrackingNode::Configure() {
       declare_parameter<std::string>("detections_topic", "detections", options);
   metadata_topic_ =
       declare_parameter<std::string>("metadata_topic", "vision_info", options);
+  input_timeout_seconds_ = declare_parameter<double>(
+      "input_timeout_seconds", kDefaultInputTimeoutSeconds, options);
+  if (!std::isfinite(input_timeout_seconds_) || input_timeout_seconds_ <= 0 ||
+      input_timeout_seconds_ > kMaxInputTimeoutSeconds) {
+    throw std::invalid_argument("invalid detection input timeout");
+  }
   config_.lost_seconds =
       declare_parameter<double>("lost_seconds", config_.lost_seconds, options);
   config_.low_threshold = declare_parameter<double>(
@@ -205,8 +214,8 @@ void TrackingNode::Receive(const vision_msgs::msg::Detection2DArray& message) {
         message.header.frame_id.front() == '/' ||
         message.header.frame_id.size() > kMaxFrameLength ||
         stamp <= metadata_stamp_ || age < -kFutureToleranceNs ||
-        age >
-            static_cast<std::int64_t>(config_.lost_seconds * kNanosPerSecond)) {
+        age > static_cast<std::int64_t>(input_timeout_seconds_ *
+                                        kNanosPerSecond)) {
       throw std::invalid_argument(
           "stale detection, invalid frame or incompatible clock");
     }
@@ -264,7 +273,7 @@ void TrackingNode::Reset(const std::string& reason) {
 void TrackingNode::Tick() {
   if (!stale_ && std::chrono::duration<double>(
                      std::chrono::steady_clock::now() - last_receive_)
-                         .count() > config_.lost_seconds) {
+                         .count() > input_timeout_seconds_) {
     Reset("Detection input timed out; tracks cleared");
   }
   PublishHealth();
@@ -283,6 +292,8 @@ void TrackingNode::PublishHealth() {
   for (const auto& [key, value] :
        std::vector<std::pair<std::string, std::string>>{
            {"visible_tracks", std::to_string(published_count_)},
+           {"input_timeout_seconds", std::to_string(input_timeout_seconds_)},
+           {"lost_seconds", std::to_string(config_.lost_seconds)},
            {"retained_tracks", std::to_string(tracker_->RetainedCount())},
            {"model_identity", model_key_}}) {
     diagnostic_msgs::msg::KeyValue entry;

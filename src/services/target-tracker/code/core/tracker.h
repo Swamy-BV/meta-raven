@@ -25,7 +25,7 @@ struct Track {
   std::string id;
 };
 
-inline constexpr double kDefaultLostSeconds = 0.75;
+inline constexpr double kDefaultLostSeconds = 1.5;
 inline constexpr double kDefaultLowThreshold = 0.5;
 inline constexpr double kDefaultHighThreshold = 0.6;
 inline constexpr double kDefaultNewThreshold = 0.7;

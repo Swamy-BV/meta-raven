@@ -2,7 +2,10 @@
   ros__parameters:
     detections_topic: /raven/vehicle_1/perception/detections
     metadata_topic: /raven/vehicle_1/perception/vision_info
-    lost_seconds: 0.75
+    # Retain unseen identities only while fresh detection frames continue.
+    lost_seconds: 1.5
+    # Reject stale measurements and clear tracking state on input silence.
+    input_timeout_seconds: 0.75
     low_threshold: 0.5
     high_threshold: 0.6
     new_threshold: 0.7

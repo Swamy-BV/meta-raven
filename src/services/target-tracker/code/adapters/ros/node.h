@@ -42,6 +42,7 @@ class TrackingNode final : public rclcpp::Node {
   void Reset(const std::string& reason);
   void PublishHealth();
   Configuration config_;
+  double input_timeout_seconds_ = 0;
   std::unique_ptr<Tracker> tracker_;
   std::string detections_topic_, metadata_topic_, frame_id_, model_key_;
   bool metadata_ready_ = false;
