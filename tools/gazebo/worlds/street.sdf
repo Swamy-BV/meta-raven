@@ -1,0 +1,778 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Open Robotics Fuel assets are CC0; numeric URI versions pin the scene assets.
+     The actor trajectory supplies scripted visual motion, not road-vehicle dynamics.
+     occluder_tree starts outside view and can be moved with the Gazebo set_pose service. -->
+<sdf version="1.9">
+  <world name="street">
+    <physics name="realtime" type="ignored">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="libGstCameraSystem.so" name="custom::GstCameraSystem">
+      <udpHost>127.0.0.1</udpHost>
+      <udpPort>5602</udpPort>
+      <useCuda>false</useCuda>
+    </plugin>
+    <scene>
+      <ambient>0.55 0.55 0.55 1</ambient>
+      <background>0.65 0.8 0.95 1</background>
+    </scene>
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>1 0.97 0.92 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.2 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+    <model name="terrain">
+      <static>true</static>
+      <pose>0 0 -0.12 0 0 0</pose>
+      <link name="body">
+        <collision name="ground">
+          <geometry>
+            <box>
+              <size>80 60 0.2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>80 60 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.26 0.35 0.18 1</ambient>
+            <diffuse>0.26 0.35 0.18 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="asphalt">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>48 9 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.09 0.095 0.10 1</ambient>
+            <diffuse>0.09 0.095 0.10 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="sidewalk_-5_8">
+      <static>true</static>
+      <pose>0 -5.8 0.10 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>48 2.6 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.57 0.56 0.53 1</ambient>
+            <diffuse>0.57 0.56 0.53 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="edge_-5_8">
+      <static>true</static>
+      <pose>0 -4.1 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>48 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.88 0.88 0.82 1</ambient>
+            <diffuse>0.88 0.88 0.82 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="sidewalk_5_8">
+      <static>true</static>
+      <pose>0 5.8 0.10 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>48 2.6 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.57 0.56 0.53 1</ambient>
+            <diffuse>0.57 0.56 0.53 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="edge_5_8">
+      <static>true</static>
+      <pose>0 4.1 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>48 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.88 0.88 0.82 1</ambient>
+            <diffuse>0.88 0.88 0.82 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_0">
+      <static>true</static>
+      <pose>-23 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_1">
+      <static>true</static>
+      <pose>-20 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_2">
+      <static>true</static>
+      <pose>-17 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_3">
+      <static>true</static>
+      <pose>-14 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_4">
+      <static>true</static>
+      <pose>-11 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_5">
+      <static>true</static>
+      <pose>-8 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_6">
+      <static>true</static>
+      <pose>-5 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_7">
+      <static>true</static>
+      <pose>-2 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_8">
+      <static>true</static>
+      <pose>1 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_9">
+      <static>true</static>
+      <pose>4 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_10">
+      <static>true</static>
+      <pose>7 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_11">
+      <static>true</static>
+      <pose>10 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_12">
+      <static>true</static>
+      <pose>13 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_13">
+      <static>true</static>
+      <pose>16 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_14">
+      <static>true</static>
+      <pose>19 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="lane_dash_15">
+      <static>true</static>
+      <pose>22 0 0.026 0 0 0</pose>
+      <link name="body">
+        <visual name="surface">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>0.95 0.72 0.05 1</diffuse>
+            <pbr>
+              <metal>
+                <metalness>0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="house_0">
+      <static>true</static>
+      <pose>-17 20 0 0 0 0</pose>
+      <link name="body">
+        <visual name="facade">
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%201/3/files/meshes/house_1.dae</uri>
+              <scale>1.5 1.5 1.5</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%201/3/files/materials/textures/House_1_Diffuse.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="house_1">
+      <static>true</static>
+      <pose>0 20 0 0 0 0</pose>
+      <link name="body">
+        <visual name="facade">
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%201/3/files/meshes/house_1.dae</uri>
+              <scale>1.5 1.5 1.5</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%201/3/files/materials/textures/House_1_Diffuse.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Office%20Building/3</uri>
+      <name>office</name>
+      <pose>18 22 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree/7</uri>
+      <name>tree_0</name>
+      <pose>-14 11 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree/7</uri>
+      <name>tree_1</name>
+      <pose>10 11 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree/7</uri>
+      <name>occluder_tree</name>
+      <pose>28 -6 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Lamp%20Post/3</uri>
+      <name>lamp_0</name>
+      <pose>-10 5.5 0 0 0 3.14159</pose>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Lamp%20Post/3</uri>
+      <name>lamp_1</name>
+      <pose>10 5.5 0 0 0 3.14159</pose>
+    </include>
+    <actor name="moving_car">
+      <link name="body">
+        <visual name="Hatchback">
+          <pose>0 0 0 0 0 1.57079632679</pose>
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/meshes/hatchback.obj</uri>
+              <scale>0.0254 0.0254 0.0254</scale>
+              <submesh>
+                <name>Hatchback</name>
+                <center>false</center>
+              </submesh>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/materials/textures/hatchback.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <visual name="Wheels_Rear">
+          <pose>0 0 0 0 0 1.57079632679</pose>
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/meshes/hatchback.obj</uri>
+              <scale>0.0254 0.0254 0.0254</scale>
+              <submesh>
+                <name>Wheels_Rear</name>
+                <center>false</center>
+              </submesh>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/materials/textures/wheels3.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <visual name="Wheel_Front_Left_">
+          <pose>0 0 0 0 0 1.57079632679</pose>
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/meshes/hatchback.obj</uri>
+              <scale>0.0254 0.0254 0.0254</scale>
+              <submesh>
+                <name>Wheel_Front_Left_</name>
+                <center>false</center>
+              </submesh>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/materials/textures/wheels3.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <visual name="Wheel_Front_Right">
+          <pose>0 0 0 0 0 1.57079632679</pose>
+          <geometry>
+            <mesh>
+              <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/meshes/hatchback.obj</uri>
+              <scale>0.0254 0.0254 0.0254</scale>
+              <submesh>
+                <name>Wheel_Front_Right</name>
+                <center>false</center>
+              </submesh>
+            </mesh>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>https://fuel.gazebosim.org/1.0/OpenRobotics/models/hatchback/3/files/materials/textures/wheels3.png</albedo_map>
+                <metalness>0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+      <script>
+        <loop>true</loop>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="drive" tension="1">
+          <waypoint>
+            <time>0</time>
+            <pose>-4 -1.5 0.05 0 0 0</pose>
+          </waypoint>
+          <waypoint>
+            <time>12</time>
+            <pose>4 -1.5 0.05 0 0 0</pose>
+          </waypoint>
+          <waypoint>
+            <time>14</time>
+            <pose>5 0 0.05 0 0 1.57079632679</pose>
+          </waypoint>
+          <waypoint>
+            <time>16</time>
+            <pose>4 1.5 0.05 0 0 3.14159265359</pose>
+          </waypoint>
+          <waypoint>
+            <time>28</time>
+            <pose>-4 1.5 0.05 0 0 3.14159265359</pose>
+          </waypoint>
+          <waypoint>
+            <time>30</time>
+            <pose>-5 0 0.05 0 0 4.71238898038</pose>
+          </waypoint>
+          <waypoint>
+            <time>32</time>
+            <pose>-4 -1.5 0.05 0 0 6.28318530718</pose>
+          </waypoint>
+        </trajectory>
+      </script>
+    </actor>
+    <model name="camera">
+      <static>true</static>
+      <pose>0 -11 3.4 0 0.23 1.57079632679</pose>
+      <link name="link">
+        <sensor name="rgb" type="camera">
+          <always_on>true</always_on>
+          <update_rate>15</update_rate>
+          <camera>
+            <horizontal_fov>1.4</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>360</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>50</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

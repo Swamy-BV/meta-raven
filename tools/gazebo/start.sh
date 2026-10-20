@@ -1,12 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: AGPL-3.0-only
 # Run a looping Gazebo camera scene and stream H.264 RTP to a board.
-# Usage: ./start.sh courtyard|warehouse <board-ipv4>
+# Usage: ./start.sh courtyard|warehouse|street <board-ipv4>
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-scene=${1:?Choose courtyard or warehouse}
+scene=${1:?Choose courtyard, warehouse or street}
 board=${2:?Provide the board IPv4 address}
-case "$scene" in courtyard|warehouse) ;; *) echo 'Unknown scene' >&2; exit 2;; esac
+case "$scene" in courtyard|warehouse|street) ;; *) echo 'Unknown scene' >&2; exit 2;; esac
 if [[ ! "$board" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo 'Expected board IPv4 address' >&2
   exit 2
