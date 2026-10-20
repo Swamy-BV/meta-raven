@@ -57,6 +57,7 @@ RDEPENDS:${PN} = "\
     gstreamer1.0-plugins-good-vpx \
     image-transport \
     platform-interfaces \
+    raven-ros-config \
     rclcpp \
     rmw-cyclonedds-cpp \
     sensor-msgs \

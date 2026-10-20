@@ -11,7 +11,7 @@
 #include <raven/contracts/camera.h>
 
 namespace raven::vision {
-// The provider returns an owned, latest frame. Only the job thread invokes it.
+// The provider returns an owned, latest frame on the application thread.
 using FrameProvider = std::function<raven::contracts::CameraFrame()>;
 
 class Engine final {
@@ -30,7 +30,8 @@ class Engine final {
   // changing selection.
   void Select(const std::string& id);
   void Cancel();
-  void Infer();
+  // False means no newer source frame is available; no job is scheduled.
+  [[nodiscard]] bool Infer();
   // Caller serializes model operations and polling on the ROS executor thread.
   [[nodiscard]] Snapshot Poll(bool automatic);
 

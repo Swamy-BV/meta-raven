@@ -14,7 +14,7 @@ LogsDirectory=media-capture
 Environment=ROS_LOG_DIR=/var/log/media-capture
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
-Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+EnvironmentFile=/etc/ros/ros2.env
 ExecStart=@ROS_PREFIX@/lib/media_capture/media-capture --ros-args --params-file /etc/media-capture.yaml
 Restart=on-failure
 RestartSec=10

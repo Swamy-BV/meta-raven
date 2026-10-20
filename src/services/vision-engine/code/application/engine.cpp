@@ -416,7 +416,7 @@ class Runner {
   uint64_t model_generation = 0;
   const std::string instance_id = NewInstanceId();
   Json job = nullptr;
-  uint64_t sequence = 0, last_frame_sequence = 0, last_frame_us = 0;
+  uint64_t sequence = 0, last_frame_sequence = 0, last_requested_stamp_ns = 0;
   Runner(const Runner&) = delete;
   Runner& operator=(const Runner&) = delete;
   Runner(Runner&&) = delete;
@@ -479,7 +479,7 @@ class Runner {
     fs::path image;
     bool selection = false;
     std::shared_ptr<ResidentWorker> runtime;
-    bool live_frame = false;
+    std::optional<raven::contracts::CameraFrame> frame;
     AssetStamps assets;
   };
 
@@ -510,7 +510,6 @@ class Runner {
                                  kMicrosPerMillisecondDouble},
         {"skipped_since_last", skipped}};
     last_frame_sequence = frame.sequence;
-    last_frame_us = frame.captured_us;
   }
 
   void RecordResult(const JobInput& input,
@@ -542,28 +541,19 @@ class Runner {
 
   Json EvaluateJob(const JobInput& input,
                    const std::shared_ptr<ResidentWorker>& runtime,
-                   raven::contracts::CameraFrame& frame,
                    std::chrono::steady_clock::time_point deadline) {
-    const auto live_frame = input.live_frame;
-    const auto& image = input.image;
-    Json result;
-    if (live_frame) {
-      frame = frames();
-      auto now = static_cast<uint64_t>(g_get_monotonic_time());
-      if (frame.captured_us > now ||
-          now - frame.captured_us >
-              static_cast<uint64_t>(c.frame_max_age) * kMicrosPerMillisecond) {
-        Fail("media frame is stale");
-      }
-      if (frame.captured_us <= last_frame_us) {
-        Fail("media frame already consumed");
-      }
-      result = runtime->InferFrame(frame.data, frame.width, frame.height,
-                                   deadline, cancel);
-    } else {
-      result = runtime->Infer(image, deadline, cancel);
+    if (!input.frame) {
+      return runtime->Infer(input.image, deadline, cancel);
     }
-    return result;
+    const auto& frame = *input.frame;
+    const auto now = static_cast<std::uint64_t>(g_get_monotonic_time());
+    if (frame.captured_us > now ||
+        now - frame.captured_us > static_cast<std::uint64_t>(c.frame_max_age) *
+                                      kMicrosPerMillisecond) {
+      Fail("media frame is stale");
+    }
+    return runtime->InferFrame(frame.data, frame.width, frame.height, deadline,
+                               cancel);
   }
 
   void CheckJobAssets(const JobInput& input, bool& assets_changed) const {
@@ -579,12 +569,10 @@ class Runner {
 
   void CompleteJob(const JobInput& input,
                    const std::shared_ptr<ResidentWorker>& runtime,
-                   const raven::contracts::CameraFrame& frame,
                    const Json& result,
                    std::chrono::steady_clock::time_point started) {
     const auto& m = input.model;
     const auto selection = input.selection;
-    const auto live_frame = input.live_frame;
     std::lock_guard<std::mutex> const lock(mutex);
     if (cancel) {
       Fail("job cancelled");
@@ -593,9 +581,10 @@ class Runner {
       Persist(c.state, m);
       selected = m.id;
       ++model_generation;
+      last_requested_stamp_ns = 0;
     }
-    if (live_frame) {
-      RecordFrame(frame);
+    if (input.frame) {
+      RecordFrame(*input.frame);
     }
     job["model_generation"] = model_generation;
     RecordResult(input, runtime, result);
@@ -620,10 +609,9 @@ class Runner {
                            m.backend, c.threads},
             deadline, cancel);
       }
-      raven::contracts::CameraFrame frame;
-      const auto result = EvaluateJob(input, runtime, frame, deadline);
+      const auto result = EvaluateJob(input, runtime, deadline);
       CheckJobAssets(input, assets_changed);
-      CompleteJob(input, runtime, frame, result, started);
+      CompleteJob(input, runtime, result, started);
     } catch (const std::exception& e) {
       std::lock_guard<std::mutex> const lock(mutex);
       if (assets_changed && !selection) {
@@ -636,8 +624,9 @@ class Runner {
     }
   }
 
-  Json Start(const Model& m, const fs::path& image, bool selection,
-             bool live_frame = false) {
+  Json Start(
+      const Model& m, const fs::path& image, bool selection,
+      std::optional<raven::contracts::CameraFrame> frame = std::nullopt) {
     if (busy) {
       Fail("worker busy; wait or cancel");
     }
@@ -661,9 +650,9 @@ class Runner {
         {"state", "running"},     {"started_us", g_get_real_time()}};
     auto current = resident;
     try {
-      const JobInput input{m,       image,      selection,
-                           current, live_frame, validated_assets};
-      pending = [this, input] { ExecuteJob(input); };
+      JobInput input{
+          m, image, selection, current, std::move(frame), validated_assets};
+      pending = [this, input = std::move(input)] { ExecuteJob(input); };
       work_ready.notify_one();
     } catch (...) {
       busy = false;
@@ -819,13 +808,26 @@ void Engine::Select(const std::string& id) {
 
 void Engine::Cancel() { impl_->runner.cancel = true; }
 
-void Engine::Infer() {
+bool Engine::Infer() {
   auto& runner = impl_->runner;
   std::lock_guard<std::mutex> const lock(runner.mutex);
   if (runner.selected.empty()) {
     Fail("no model selected");
   }
-  runner.Start(runner.Find(runner.selected), {}, false, true);
+  if (runner.busy) {
+    Fail("worker busy; wait or cancel");
+  }
+  auto frame = runner.frames();
+  // Use the source identity, not a repeatedly mapped monotonic timestamp.
+  // Polling faster than capture must neither reinfer a frame nor report an
+  // error.
+  if (frame.source_stamp_ns <= runner.last_requested_stamp_ns) {
+    return false;
+  }
+  const auto stamp = frame.source_stamp_ns;
+  runner.Start(runner.Find(runner.selected), {}, false, std::move(frame));
+  runner.last_requested_stamp_ns = stamp;
+  return true;
 }
 
 Snapshot Engine::Poll(bool automatic) {
@@ -861,7 +863,10 @@ Snapshot Engine::Poll(bool automatic) {
       "backend", status.at("selected_model").at("backend").get<std::string>());
   snapshot.metrics.emplace_back("busy", status.at("busy").dump());
   if (automatic && MayInfer(status)) {
-    Infer();
+    const auto accepted = Infer();
+    if (!accepted && !snapshot.result) {
+      snapshot.health = "Waiting for a newer camera frame";
+    }
   }
   return snapshot;
 }

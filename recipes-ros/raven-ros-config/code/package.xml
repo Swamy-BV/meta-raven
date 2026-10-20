@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>raven_ros_config</name>
+  <version>1.0.0</version>
+  <description>Common onboard DDS discovery and ROS environment defaults.</description>
+  <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
+  <license>AGPL-3.0-only</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>rmw_cyclonedds_cpp</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

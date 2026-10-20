@@ -12,7 +12,7 @@
 #include <raven/contracts/camera.h>
 
 // One latest ROS sample. Receive runs on the ROS executor; Latest runs
-// on the inference worker. It returns packed pixels owned by the caller.
+// on the application thread. It returns packed pixels owned by the caller.
 class RosFrameInput {
  public:
   RosFrameInput(rclcpp::Node& node, const std::string& topic);

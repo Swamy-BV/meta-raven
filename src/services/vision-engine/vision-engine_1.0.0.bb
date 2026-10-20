@@ -44,6 +44,7 @@ FILES:${PN} += "${nonarch_libdir}/tmpfiles.d/vision-engine.conf"
 RDEPENDS:${PN} = "\
     diagnostic-msgs \
     gdk-pixbuf-loader-bmp \
+    raven-ros-config \
     rcl-interfaces \
     rclcpp \
     rmw-cyclonedds-cpp \

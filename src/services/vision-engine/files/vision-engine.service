@@ -13,7 +13,7 @@ LogsDirectory=vision-engine
 Environment=ROS_LOG_DIR=/var/log/vision-engine
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
-Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+EnvironmentFile=/etc/ros/ros2.env
 ExecStart=@ROS_PREFIX@/lib/vision_engine/vision-engine --ros-args --params-file /etc/vision-engine.yaml
 Restart=on-failure
 RestartSec=10

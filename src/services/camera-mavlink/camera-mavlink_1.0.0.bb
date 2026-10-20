@@ -22,7 +22,7 @@ USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "--system --gid 978 camera-mavlink"
 USERADD_PARAM:${PN} = "--system --uid 978 --gid camera-mavlink --no-create-home --shell /sbin/nologin camera-mavlink"
 CONFFILES:${PN} = "${sysconfdir}/camera-mavlink.yaml"
-RDEPENDS:${PN} = "mavlink-router media-capture rmw-cyclonedds-cpp"
+RDEPENDS:${PN} = "mavlink-router media-capture raven-ros-config rmw-cyclonedds-cpp"
 
 do_install:append() {
     install -D -m 0644 ${UNPACKDIR}/camera-mavlink.yaml ${D}${sysconfdir}/camera-mavlink.yaml

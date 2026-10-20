@@ -174,11 +174,11 @@ void VisionNode::CreateCommands() {
       [this](const std_srvs::srv::Trigger::Request::ConstSharedPtr&,
              const std_srvs::srv::Trigger::Response::SharedPtr& reply) {
         try {
-          engine_->Infer();
-          reply->success = true;
+          reply->success = engine_->Infer();
           reply->message =
-              "Inference accepted; results and completion are published "
-              "asynchronously";
+              reply->success
+                  ? "Inference accepted; completion is published asynchronously"
+                  : "Waiting for a newer camera frame";
         } catch (const std::exception& error) {
           reply->message = error.what();
         }

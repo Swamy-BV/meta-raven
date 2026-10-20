@@ -8,7 +8,7 @@ User=camera-mavlink
 Group=camera-mavlink
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
-Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+EnvironmentFile=/etc/ros/ros2.env
 Environment=ROS_LOG_DIR=/var/log/camera-mavlink
 LogsDirectory=camera-mavlink
 ExecStart=@ROS_PREFIX@/lib/camera_mavlink/camera-mavlink --ros-args --params-file /etc/camera-mavlink.yaml
