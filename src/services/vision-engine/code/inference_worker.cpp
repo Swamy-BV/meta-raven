@@ -38,6 +38,7 @@
 #include "detection.h"
 #include "neutron_backend.h"
 #include "rgb_input.h"
+#include "yolov8_model.h"
 #include <raven/contracts/camera.h>
 
 namespace {
@@ -402,6 +403,8 @@ class Classifier : public InferenceModel {
   int width_ = 0, height_ = 0, classes_ = 0;
   bool detector_ = false;
   bool yolo4_ = false;
+  bool yolo8_ = false;
+  raven::vision::Letterbox letterbox_;
   int max_detections_ = 0;
   double load_ms_;
   uint64_t count_ = 0;
@@ -510,6 +513,42 @@ class Classifier : public InferenceModel {
             "SSD count tensor mismatch");
   }
 
+  void ValidateClassifier(const TfLiteTensor* input,
+                          TfLiteQuantizationParams quant) {
+    // Original MobileNetV1 models consume byte-valued RGB. Other quantization
+    // or preprocessing contracts need their own explicit, tested adapter.
+    Require(
+        width_ > 0 && width_ <= kMaxClassifierDimension && height_ > 0 &&
+            height_ <= kMaxClassifierDimension && std::isfinite(quant.scale) &&
+            quant.scale > 0 &&
+            ((quant.zero_point == kSignedByteOffset &&
+              std::abs(quant.scale - 1.0f / kClassifierNormalizationDivisor) <
+                  kQuantizationTolerance) ||
+             (detector_ && quant.zero_point == 0 &&
+              std::abs(quant.scale - 1.0f) < kQuantizationTolerance)) &&
+            TfLiteTensorByteSize(input) ==
+                static_cast<size_t>(width_) * height_ * 3,
+        "unsupported input size or normalization contract");
+    const auto* output =
+        TfLiteInterpreterGetOutputTensor(interpreter_.get(), 0);
+    if (detector_) {
+      ValidateSsd(output);
+      return;
+    }
+    Require(TfLiteTensorType(output) == kTfLiteUInt8 &&
+                TfLiteTensorNumDims(output) == 2 &&
+                TfLiteTensorDim(output, 0) == 1,
+            "adapter requires uint8 class probabilities");
+    classes_ = TfLiteTensorDim(output, 1);
+    auto output_quant = TfLiteTensorQuantizationParams(output);
+    Require(classes_ > 0 && static_cast<size_t>(classes_) == labels_.size() &&
+                TfLiteTensorByteSize(output) == static_cast<size_t>(classes_) &&
+                std::isfinite(output_quant.scale) && output_quant.scale > 0 &&
+                output_quant.zero_point >= 0 &&
+                output_quant.zero_point <= kMaxQuantizedByte,
+            "output shape, labels or quantization mismatch");
+  }
+
  public:
   // Arguments have distinct validated asset/option roles.
   // NOLINTBEGIN(bugprone-easily-swappable-parameters)
@@ -518,15 +557,23 @@ class Classifier : public InferenceModel {
     // NOLINTEND(bugprone-easily-swappable-parameters)
     Require(std::string(task) == "classification" ||
                 std::string(task) == "detection" ||
-                std::string(task) == "yolov4-tiny",
+                std::string(task) == "yolov4-tiny" ||
+                std::string(task) == "yolov8-logical",
             "unsupported inference task");
     detector_ = std::string(task) == "detection";
     yolo4_ = std::string(task) == "yolov4-tiny";
+    yolo8_ = std::string(task) == "yolov8-logical";
     auto started = Clock::now();
     ReadLabels(label_file);
     // Arguments have distinct validated asset/option roles.
     // NOLINTBEGIN(bugprone-easily-swappable-parameters)
     Initialize(file, backend, threads);
+    if (yolo8_) {
+      Require(labels_.size() == kCocoClassCount, "YOLOv8 requires COCO labels");
+      raven::vision::ValidateYoloV8(interpreter_.get());
+      load_ms_ = Milliseconds(started);
+      return;
+    }
     Require(TfLiteInterpreterGetInputTensorCount(interpreter_.get()) == 1 &&
                 TfLiteInterpreterGetOutputTensorCount(interpreter_.get()) ==
                     (yolo4_      ? 2
@@ -548,39 +595,7 @@ class Classifier : public InferenceModel {
       load_ms_ = Milliseconds(started);
       return;
     }
-    // Original MobileNetV1 models consume byte-valued RGB. Other quantization
-    // or preprocessing contracts need their own explicit, tested adapter.
-    Require(
-        width_ > 0 && width_ <= kMaxClassifierDimension && height_ > 0 &&
-            height_ <= kMaxClassifierDimension && std::isfinite(quant.scale) &&
-            quant.scale > 0 &&
-            ((quant.zero_point == kSignedByteOffset &&
-              std::abs(quant.scale - 1.0f / kClassifierNormalizationDivisor) <
-                  kQuantizationTolerance) ||
-             (detector_ && quant.zero_point == 0 &&
-              std::abs(quant.scale - 1.0f) < kQuantizationTolerance)) &&
-            TfLiteTensorByteSize(input) ==
-                static_cast<size_t>(width_) * height_ * 3,
-        "unsupported input size or normalization contract");
-    const auto* output =
-        TfLiteInterpreterGetOutputTensor(interpreter_.get(), 0);
-    if (detector_) {
-      ValidateSsd(output);
-      load_ms_ = Milliseconds(started);
-      return;
-    }
-    Require(TfLiteTensorType(output) == kTfLiteUInt8 &&
-                TfLiteTensorNumDims(output) == 2 &&
-                TfLiteTensorDim(output, 0) == 1,
-            "adapter requires uint8 class probabilities");
-    classes_ = TfLiteTensorDim(output, 1);
-    auto output_quant = TfLiteTensorQuantizationParams(output);
-    Require(classes_ > 0 && static_cast<size_t>(classes_) == labels_.size() &&
-                TfLiteTensorByteSize(output) == static_cast<size_t>(classes_) &&
-                std::isfinite(output_quant.scale) && output_quant.scale > 0 &&
-                output_quant.zero_point >= 0 &&
-                output_quant.zero_point <= kMaxQuantizedByte,
-            "output shape, labels or quantization mismatch");
+    ValidateClassifier(input, quant);
     load_ms_ = Milliseconds(started);
   }
 
@@ -607,7 +622,16 @@ class Classifier : public InferenceModel {
     return Classify(std::move(decoded), started);
   }
 
-  void PrepareTensor(const Pixbuf& decoded) const {
+  void PrepareTensor(const Pixbuf& decoded) {
+    if (yolo8_) {
+      letterbox_ = raven::vision::PrepareYoloV8(
+          interpreter_.get(), {gdk_pixbuf_read_pixels(decoded.get()),
+                               gdk_pixbuf_get_width(decoded.get()),
+                               gdk_pixbuf_get_height(decoded.get()),
+                               gdk_pixbuf_get_rowstride(decoded.get()),
+                               gdk_pixbuf_get_n_channels(decoded.get())});
+      return;
+    }
     Pixbuf const resized(gdk_pixbuf_scale_simple(decoded.get(), width_, height_,
                                                  GDK_INTERP_BILINEAR),
                          g_object_unref);
@@ -696,8 +720,12 @@ class Classifier : public InferenceModel {
 
   Json YoloResult(double preprocess, double invoke_ms) {
     std::vector<detection::Box> boxes;
-    for (int output_index = 0; output_index < 2; ++output_index) {
-      AppendYoloOutput(output_index, boxes);
+    if (yolo8_) {
+      boxes = raven::vision::DecodeYoloV8(interpreter_.get(), letterbox_);
+    } else {
+      for (int output_index = 0; output_index < 2; ++output_index) {
+        AppendYoloOutput(output_index, boxes);
+      }
     }
     return {{"ok", true},
             {"task", "detection"},
@@ -784,7 +812,7 @@ class Classifier : public InferenceModel {
     Require(TfLiteInterpreterInvoke(interpreter_.get()) == kTfLiteOk,
             "inference failed");
     double invoke_ms = Milliseconds(started);
-    if (yolo4_) {
+    if (yolo4_ || yolo8_) {
       return YoloResult(preprocess, invoke_ms);
     }
     if (detector_) {

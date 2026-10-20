@@ -302,7 +302,7 @@ static void Validate(const Settings& c, const Model& m) {
     Fail("Neutron requires an i.MX95 converted TensorFlow Lite model");
   }
   if ((!onnx && m.adapter != "classification" && m.adapter != "detection" &&
-       m.adapter != "yolov4-tiny") ||
+       m.adapter != "yolov4-tiny" && m.adapter != "yolov8-logical") ||
       ((m.task == "classification") != (m.adapter == "classification"))) {
     Fail("model task/adapter mismatch");
   }

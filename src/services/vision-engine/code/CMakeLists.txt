@@ -31,10 +31,12 @@ add_executable(
   core/decode.cpp
   inference_worker.cpp
   onnx_model.cpp
+  yolov8_model.cpp
   neutron_backend.cpp
   adapters/ros/frame_input.cpp
   adapters/ros/node.cpp)
 target_include_directories(vision-engine PRIVATE ${TFLITE_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(vision-engine SYSTEM PRIVATE ${GLIB_INCLUDE_DIRS} ${PIXBUF_INCLUDE_DIRS})
 target_link_libraries(
   vision-engine
   Microsoft.GSL::GSL

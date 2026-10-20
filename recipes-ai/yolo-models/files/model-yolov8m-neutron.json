@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "id": "yolov8m-neutron",
+      "version": "1.0.0",
+      "task": "detection",
+      "backend": "neutron",
+      "adapter": "yolov8-logical",
+      "file": "yolov8m-neutron.tflite",
+      "sha256": "@MODEL_SHA256@",
+      "labels": "yolo-labels.txt",
+      "labels_sha256": "d7654b26101572841ed1cd80aa03aa60e35f1b8acb4aea6906c4066886f16e07",
+      "license": "AGPL-3.0-only"
+    }
+  ]
+}
