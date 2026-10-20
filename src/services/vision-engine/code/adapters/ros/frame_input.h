@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 
+#include <rclcpp/clock.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/subscription.hpp>
 
@@ -24,4 +25,7 @@ class RosFrameInput {
   mutable std::mutex mutex_;
   sensor_msgs::msg::Image::ConstSharedPtr latest_;
   std::uint64_t sequence_ = 0;
+  rclcpp::Clock::SharedPtr clock_;
+  std::uint64_t captured_us_ = 0;
+  std::uint64_t captured_unix_us_ = 0;
 };

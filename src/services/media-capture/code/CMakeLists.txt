@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(image_transport REQUIRED)
+find_package(camera_info_manager REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(raven_interfaces REQUIRED)
@@ -43,6 +44,7 @@ ament_target_dependencies(
   rclcpp
   rcl_interfaces
   image_transport
+  camera_info_manager
   sensor_msgs
   rclcpp_action
   raven_interfaces

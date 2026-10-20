@@ -21,6 +21,7 @@
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/expand_topic_or_service_name.hpp>
 #include <rclcpp/logging.hpp>
+#include <rclcpp/parameter.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/time.hpp>
 #include <rclcpp_action/create_server.hpp>
@@ -76,6 +77,14 @@ MediaCaptureNode::MediaCaptureNode(std::unique_ptr<CaptureBackend> backend,
       backend_(std::move(backend)) {
   optical_frame_ =
       declare_parameter<std::string>("optical_frame", "camera_optical_frame");
+  const auto calibration_url =
+      declare_parameter<std::string>("camera_info_url", "");
+  camera_info_ = std::make_unique<camera_info_manager::CameraInfoManager>(
+      this, "front_camera");
+  if (!calibration_url.empty() &&
+      !camera_info_->loadCameraInfo(calibration_url)) {
+    throw std::invalid_argument("Unable to load camera_info_url");
+  }
   const auto settings = ReadSettings();
   store_ = store(settings);
   session_ = std::make_unique<Session>(settings, *backend_, *store_);
@@ -171,6 +180,9 @@ void MediaCaptureNode::ChangeSource(
     }
   }
   session_->ConfigureSource(source);
+  // The configured calibration belongs to the startup source. A new source
+  // must supply its own CameraInfo or be restarted with its calibration URL.
+  configured_calibration_valid_ = false;
   ConfigureInput();
   PublishCapabilities();
 }
@@ -284,6 +296,9 @@ void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
        frame.width,
        frame.height,
        frame.source_stamp_ns});
+  if (frame.source_stamp_ns == 0 && !MapNativeStamp(image.header)) {
+    return;
+  }
   image.width = frame.width;
   image.height = frame.height;
   image.encoding = "rgb8";
@@ -293,6 +308,14 @@ void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
   info.header = image.header;
   info.width = image.width;
   info.height = image.height;
+  // Configured calibration applies only at its original resolution.
+  if (configured_calibration_valid_ && camera_info_->isCalibrated()) {
+    const auto configured = camera_info_->getCameraInfo();
+    if (configured.width == image.width && configured.height == image.height) {
+      info = configured;
+      info.header = image.header;
+    }
+  }
   // Unknown or differently sized calibration is never invented.
   if (calibration_.header.frame_id == image.header.frame_id &&
       calibration_.width == image.width &&
@@ -303,9 +326,30 @@ void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
   images_.publish(image, info);
 }
 
+bool MediaCaptureNode::MapNativeStamp(std_msgs::msg::Header& header) const {
+  if (!get_parameter("use_sim_time").as_bool()) {
+    return true;
+  }
+  const auto wall = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                        .count();
+  const auto source = rclcpp::Time(header.stamp).nanoseconds();
+  const auto stamp = now().nanoseconds() - (wall - source);
+  if (source > wall || stamp <= 0) {
+    return false;  // Wait for Clock; never mix wall and simulation epochs.
+  }
+  header.stamp = rclcpp::Time(stamp);
+  return true;
+}
+
 void MediaCaptureNode::PublishPhoto(const Photo& photo) {
   raven_interfaces::msg::MediaCaptureEvent event;
   event.header = Header(photo);
+  if (photo.source_stamp_ns == 0 && !MapNativeStamp(event.header)) {
+    // Capture completed, but its ROS time is unknown.
+    event.header.stamp.sec = 0;
+    event.header.stamp.nanosec = 0;
+  }
   if (event.header.frame_id.empty()) {
     event.header.frame_id = optical_frame_;
   }

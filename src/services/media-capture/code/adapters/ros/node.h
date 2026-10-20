@@ -6,6 +6,8 @@
 #include <string>
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "std_msgs/msg/header.hpp"
+#include <camera_info_manager/camera_info_manager.hpp>
 #include <image_transport/camera_publisher.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
@@ -58,6 +60,7 @@ class MediaCaptureNode final : public rclcpp::Node {
   void PublishState();
   void PublishCapabilities();
   void PublishPhoto(const Photo& photo);
+  [[nodiscard]] bool MapNativeStamp(std_msgs::msg::Header& header) const;
   void Tick();
   [[nodiscard]] Settings ReadSettings();
   std::unique_ptr<CaptureBackend> backend_;
@@ -73,6 +76,8 @@ class MediaCaptureNode final : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr input_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr input_info_;
   sensor_msgs::msg::CameraInfo calibration_;
+  std::unique_ptr<camera_info_manager::CameraInfoManager> camera_info_;
+  bool configured_calibration_valid_ = true;
   rclcpp::Service<raven_interfaces::srv::SetMediaProfile>::SharedPtr profile_;
   rclcpp::Service<raven_interfaces::srv::SetMediaSource>::SharedPtr source_;
   rclcpp::Service<raven_interfaces::srv::SetMediaMode>::SharedPtr mode_;

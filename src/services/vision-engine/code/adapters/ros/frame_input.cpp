@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -12,6 +11,7 @@
 
 #include <glib.h>
 #include <rclcpp/qos.hpp>
+#include <rclcpp/time.hpp>
 
 #include "sensor_msgs/msg/image.hpp"
 #include <raven/contracts/camera.h>
@@ -21,7 +21,6 @@ constexpr auto kMinDimension = 64;
 constexpr auto kMaxWidth = 1920;
 constexpr auto kMaxHeight = 1080;
 constexpr auto kChannels = 3;
-constexpr std::uint64_t kMicrosPerSecond = 1000000;
 constexpr std::uint32_t kNanosPerMicro = 1000;
 constexpr std::uint32_t kNanosPerSecond = 1000000000;
 
@@ -38,7 +37,8 @@ bool Valid(const sensor_msgs::msg::Image& image) {
 }
 }  // namespace
 
-RosFrameInput::RosFrameInput(rclcpp::Node& node, const std::string& topic) {
+RosFrameInput::RosFrameInput(rclcpp::Node& node, const std::string& topic)
+    : clock_(node.get_clock()) {
   if (topic.empty()) {
     throw std::invalid_argument("camera topic must not be empty");
   }
@@ -54,7 +54,24 @@ void RosFrameInput::Receive(sensor_msgs::msg::Image::ConstSharedPtr image) {
   ++sequence_;
   // Invalid input clears the retained sample, so it cannot masquerade as a
   // valid stream. Latest reports the missing/invalid-frame failure to the job.
-  latest_ = Valid(*image) ? std::move(image) : nullptr;
+  latest_.reset();
+  if (!Valid(*image)) {
+    return;
+  }
+  const auto stamp =
+      static_cast<std::int64_t>(image->header.stamp.sec) * kNanosPerSecond +
+      image->header.stamp.nanosec;
+  const auto age_ns = clock_->now().nanoseconds() - stamp;
+  const auto monotonic = static_cast<std::uint64_t>(g_get_monotonic_time());
+  const auto wall = static_cast<std::uint64_t>(g_get_real_time());
+  if (age_ns < 0 ||
+      static_cast<std::uint64_t>(age_ns / kNanosPerMicro) >= monotonic) {
+    return;
+  }
+  const auto age_us = static_cast<std::uint64_t>(age_ns / kNanosPerMicro);
+  captured_us_ = monotonic - age_us;
+  captured_unix_us_ = wall - age_us;
+  latest_ = std::move(image);
 }
 
 raven::contracts::CameraFrame RosFrameInput::Latest() const {
@@ -64,6 +81,8 @@ raven::contracts::CameraFrame RosFrameInput::Latest() const {
     std::lock_guard<std::mutex> const lock(mutex_);
     image = latest_;
     frame.sequence = sequence_;
+    frame.captured_us = captured_us_;
+    frame.captured_unix_us = captured_unix_us_;
   }
   if (!image) {
     throw std::runtime_error("no valid ROS RGB camera frame");
@@ -71,16 +90,6 @@ raven::contracts::CameraFrame RosFrameInput::Latest() const {
   frame.source_stamp_ns =
       static_cast<std::uint64_t>(image->header.stamp.sec) * kNanosPerSecond +
       image->header.stamp.nanosec;
-  frame.captured_unix_us =
-      static_cast<std::uint64_t>(image->header.stamp.sec) * kMicrosPerSecond +
-      image->header.stamp.nanosec / kNanosPerMicro;
-  const auto wall = static_cast<std::uint64_t>(g_get_real_time());
-  const auto monotonic = static_cast<std::uint64_t>(g_get_monotonic_time());
-  if (frame.captured_unix_us > wall ||
-      wall - frame.captured_unix_us >= monotonic) {
-    throw std::runtime_error("camera timestamp is outside the local clock");
-  }
-  frame.captured_us = monotonic - (wall - frame.captured_unix_us);
   frame.source_time_mapped = true;
   frame.optical_frame = image->header.frame_id;
   frame.width = static_cast<int>(image->width);

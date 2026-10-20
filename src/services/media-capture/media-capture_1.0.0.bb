@@ -8,6 +8,7 @@ LICENSE = "AGPL-3.0-only"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c55bf9493b7dd6e480788"
 DEPENDS = "\
     ament-cmake-native \
+    camera-info-manager \
     diagnostic-msgs \
     gdk-pixbuf \
     glib-2.0 \
@@ -38,6 +39,7 @@ USERADD_PARAM:${PN} = "--system --uid 970 --gid media-capture --home-dir ${local
 CONFFILES:${PN} = "${sysconfdir}/media-capture.yaml"
 FILES:${PN}:append = " ${systemd_system_unitdir}/media-capture.service.d ${nonarch_libdir}/tmpfiles.d"
 RDEPENDS:${PN} = "\
+    camera-info-manager \
     gstreamer1.0-plugins-bad-videoparsersbad \
     gstreamer1.0-plugins-base-app \
     gstreamer1.0-plugins-base-playback \

@@ -12,6 +12,7 @@
   <depend>raven_interfaces</depend>
   <depend>diagnostic_msgs</depend>
   <depend>image_transport</depend>
+  <depend>camera_info_manager</depend>
   <depend>sensor_msgs</depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

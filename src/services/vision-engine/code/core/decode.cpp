@@ -46,9 +46,11 @@ Result ReadFrame(const nlohmann::json& job, const Identity& identity) {
   result.stamp_us = frame.at("captured_unix_us");
   result.stamp_ns =
       frame.value("source_stamp_ns", result.stamp_us * kNanosPerMicro);
-  if (result.stamp_ns / kNanosPerMicro != result.stamp_us) {
-    throw std::runtime_error("inconsistent frame timestamp");
-  }
+  // ROS source time may be simulated. Freshness uses the independent monotonic
+  // capture timestamp; do not require ROS and Unix epochs to be equal.
+  Require(
+      result.stamp_ns > 0 && result.stamp_ns / kNanosPerMicro <= kMaxRosStampUs,
+      "invalid source clock timestamp");
   result.captured_monotonic_us = frame.at("captured_monotonic_us");
   result.pts_ns = frame.at("source_pts_ns");
   result.pts_valid = frame.at("source_pts_valid");

@@ -100,10 +100,6 @@ void VisionNode::Configure() {
       frame_id_.front() == '/') {
     throw std::invalid_argument("invalid result age or optical frame");
   }
-  if (get_parameter("use_sim_time").as_bool()) {
-    throw std::invalid_argument(
-        "source wall timestamps require a system-time ROS clock");
-  }
   frames_ = std::make_unique<RosFrameInput>(*this, topic);
   engine_ = std::make_unique<Engine>(
       config, [this] { return frames_->Latest(); },
@@ -152,9 +148,6 @@ rcl_interfaces::msg::SetParametersResult VisionNode::UpdateParameters(
 
 void VisionNode::ApplyParameter(const rclcpp::Parameter& parameter,
                                 std::size_t count) {
-  if (parameter.get_name() == "use_sim_time" && parameter.as_bool()) {
-    throw std::invalid_argument("simulation-time input is not supported");
-  }
   if (parameter.get_name() != "model") {
     return;
   }
@@ -201,6 +194,9 @@ void VisionNode::CreateCommands() {
 }
 
 void VisionNode::PublishMetadata(const Snapshot& snapshot) {
+  if (now().nanoseconds() <= 0) {
+    return;  // Publish model identity only after the ROS clock is available.
+  }
   const auto key = snapshot.identity
                        ? snapshot.identity->instance + ':' +
                              std::to_string(snapshot.identity->generation)
@@ -288,10 +284,6 @@ void VisionNode::PublishHealth(const std::string& text, bool failed, bool fresh,
 
 void VisionNode::Tick() {
   try {
-    if (get_parameter("use_sim_time").as_bool()) {
-      throw std::runtime_error(
-          "source timestamp mapping does not support ROS simulation time");
-    }
     const auto snapshot = engine_->Poll(get_parameter("auto_infer").as_bool());
     PublishMetadata(snapshot);
     if (snapshot.result) {
