@@ -1,0 +1,2 @@
+# Patch context must preserve upstream whitespace and CRLF line endings.
+*.patch -text whitespace=-blank-at-eol,-space-before-tab,cr-at-eol

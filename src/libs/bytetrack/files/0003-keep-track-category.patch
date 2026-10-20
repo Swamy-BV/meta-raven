@@ -1,0 +1,78 @@
+From: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+Subject: [PATCH] Preserve established track category across class-agnostic association
+
+Keep raw geometric association confidence separate from retained category
+evidence. Instantaneous detector classifications remain available upstream.
+
+Upstream-Status: Pending
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+--- a/deploy/TensorRT/cpp/include/STrack.h
++++ b/deploy/TensorRT/cpp/include/STrack.h
+@@ -16,7 +16,7 @@
+ class STrack
+ {
+ public:
+-	STrack(vector<float> tlwh_, float score);
++	STrack(vector<float> tlwh_, float score, int label = -1);
+ 	~STrack();
+ 
+ 	vector<float> static tlbr_to_tlwh(vector<float> &tlbr);
+@@ -48,6 +48,9 @@
+ 	KAL_MEAN mean;
+ 	KAL_COVA covariance;
+ 	float score;
++	// Category and confidence retain their last matching observation.
++	int label;
++	float label_score;
+ 	double last_seen_seconds = 0;
+ 
+ private:
+--- a/deploy/TensorRT/cpp/src/STrack.cpp
++++ b/deploy/TensorRT/cpp/src/STrack.cpp
+@@ -1,6 +1,6 @@
+ #include "STrack.h"
+ 
+-STrack::STrack(vector<float> tlwh_, float score)
++STrack::STrack(vector<float> tlwh_, float score, int label)
+ {
+ 	_tlwh.resize(4);
+ 	_tlwh.assign(tlwh_.begin(), tlwh_.end());
+@@ -17,6 +17,8 @@
+ 	frame_id = 0;
+ 	tracklet_len = 0;
+ 	this->score = score;
++	this->label = label;
++	this->label_score = score;
+ 	start_frame = 0;
+ }
+ 
+@@ -78,6 +80,8 @@
+ 	this->is_activated = true;
+ 	this->frame_id = frame_id;
+ 	this->score = new_track.score;
++	if (new_track.label == this->label)
++		this->label_score = new_track.score;
+ 
+ }
+ 
+@@ -104,6 +108,8 @@
+ 	this->is_activated = true;
+ 
+ 	this->score = new_track.score;
++	if (new_track.label == this->label)
++		this->label_score = new_track.score;
+ }
+ 
+ void STrack::static_tlwh()
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -61,7 +61,7 @@
+ 
+ 			float score = objects[i].prob;
+ 
+-			STrack strack(STrack::tlbr_to_tlwh(tlbr_), score);
++			STrack strack(STrack::tlbr_to_tlwh(tlbr_), score, objects[i].label);
+ 			if (score >= track_thresh)
+ 			{
+ 				detections.push_back(strack);

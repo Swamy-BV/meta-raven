@@ -98,6 +98,8 @@ void TrackingNode::Configure() {
       input_timeout_seconds_ > kMaxInputTimeoutSeconds) {
     throw std::invalid_argument("invalid detection input timeout");
   }
+  config_.class_agnostic =
+      declare_parameter<bool>("class_agnostic", false, options);
   config_.lost_seconds =
       declare_parameter<double>("lost_seconds", config_.lost_seconds, options);
   config_.low_threshold = declare_parameter<double>(
@@ -307,6 +309,8 @@ void TrackingNode::PublishHealth() {
   status.message = status_;
   for (const auto& [key, value] :
        std::vector<std::pair<std::string, std::string>>{
+           {"association",
+            config_.class_agnostic ? "class-independent" : "per-class"},
            {"visible_tracks", std::to_string(published_count_)},
            {"input_timeout_seconds", std::to_string(input_timeout_seconds_)},
            {"lost_seconds", std::to_string(config_.lost_seconds)},

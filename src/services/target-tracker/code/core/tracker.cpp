@@ -4,6 +4,7 @@
 #include <BYTETracker.h>
 #include <STrack.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -71,7 +72,7 @@ std::string InstanceId() {
   return text.str();
 }
 
-Object UpstreamObject(const Observation& value) {
+Object UpstreamObject(const Observation& value, const int label) {
   Object object{};
   object.rect = {
       static_cast<float>(value.box.center_x - value.box.width * kHalf),
@@ -79,6 +80,7 @@ Object UpstreamObject(const Observation& value) {
       static_cast<float>(value.box.width),
       static_cast<float>(value.box.height)};
   object.prob = static_cast<float>(value.score);
+  object.label = label;
   return object;
 }
 }  // namespace
@@ -102,8 +104,8 @@ class Tracker::Impl {
   };
 
   using Groups = std::map<std::string, std::vector<Object>>;
-  [[nodiscard]] Groups Group(
-      const std::vector<Observation>& observations) const;
+  [[nodiscard]] Groups Group(const std::vector<Observation>& observations);
+  int LabelCode(const std::string& label);
   void AddClasses(const Groups& groups);
   void Prune();
   [[nodiscard]] Track Output(const STrack& value, const std::string& label,
@@ -114,10 +116,11 @@ class Tracker::Impl {
   std::size_t next_class_ = 0;
   std::optional<std::int64_t> last_stamp_;
   std::map<std::string, ClassState> classes_;
+  std::vector<std::string> labels_;
 };
 
 Tracker::Impl::Groups Tracker::Impl::Group(
-    const std::vector<Observation>& observations) const {
+    const std::vector<Observation>& observations) {
   if (observations.size() > config_.max_detections) {
     throw std::invalid_argument("detection count exceeds configured limit");
   }
@@ -125,10 +128,27 @@ Tracker::Impl::Groups Tracker::Impl::Group(
   for (const auto& observation : observations) {
     Validate(observation);
     if (observation.score >= config_.low_threshold) {
-      groups[observation.class_id].push_back(UpstreamObject(observation));
+      const auto& group =
+          config_.class_agnostic ? std::string("all") : observation.class_id;
+      groups[group].push_back(UpstreamObject(
+          observation,
+          config_.class_agnostic ? LabelCode(observation.class_id) : 0));
     }
   }
   return groups;
+}
+
+int Tracker::Impl::LabelCode(const std::string& label) {
+  const auto found = std::find(labels_.begin(), labels_.end(), label);
+  if (found != labels_.end()) {
+    return static_cast<int>(found - labels_.begin());
+  }
+  if (labels_.size() >= kMaxDetections) {
+    throw std::invalid_argument(
+        "model class vocabulary exceeds configured bound");
+  }
+  labels_.push_back(label);
+  return static_cast<int>(labels_.size() - 1);
 }
 
 void Tracker::Impl::AddClasses(const Groups& groups) {
@@ -170,8 +190,15 @@ Track Tracker::Impl::Output(const STrack& value, const std::string& label,
                            static_cast<double>(value.tlwh[1]) +
                                static_cast<double>(value.tlwh[3]) * kHalf,
                            value.tlwh[2], value.tlwh[3]};
-  track.observation.class_id = label;
-  track.observation.score = value.score;
+  if (config_.class_agnostic &&
+      (value.label < 0 ||
+       static_cast<std::size_t>(value.label) >= labels_.size())) {
+    throw std::runtime_error("invalid retained ByteTrack category");
+  }
+  track.observation.class_id =
+      config_.class_agnostic ? labels_[value.label] : label;
+  track.observation.score =
+      config_.class_agnostic ? value.label_score : value.score;
   Validate(track.observation);
   track.id = instance_ + ':' + std::to_string(generation_) + ':' +
              std::to_string(number) + ':' + std::to_string(value.track_id);
@@ -184,12 +211,12 @@ std::vector<Track> Tracker::Impl::Update(
     throw std::invalid_argument(
         "tracking requires increasing acquisition time");
   }
-  const auto groups = Group(observations);
   if (last_stamp_ &&
       static_cast<double>(stamp_ns - *last_stamp_) / kNanosPerSecond >
           config_.lost_seconds) {
     Reset();
   }
+  const auto groups = Group(observations);
   AddClasses(groups);
   const auto step =
       last_stamp_
@@ -227,6 +254,7 @@ void Tracker::Impl::Reset() {
     throw std::overflow_error("tracking generation exhausted");
   }
   classes_.clear();
+  labels_.clear();
   next_class_ = 0;
   last_stamp_.reset();
   ++generation_;

@@ -35,6 +35,7 @@ inline constexpr std::size_t kDefaultClasses = 8;
 inline constexpr std::size_t kDefaultDetections = 128;
 
 struct Configuration {
+  bool class_agnostic = false;
   double lost_seconds = kDefaultLostSeconds;
   double low_threshold = kDefaultLowThreshold;
   double high_threshold = kDefaultHighThreshold;
@@ -48,7 +49,9 @@ struct Configuration {
 // One instance owns one camera stream. Call serially, with strictly increasing
 // acquisition timestamps in nanoseconds. Outputs are measurement-backed tracks;
 // temporarily lost predictions are retained internally, never published as
-// seen.
+// seen. Optional class-agnostic association retains the category established
+// at birth; its score is the last observation supporting that category. Raw
+// detector hypotheses remain independent of this temporal track metadata.
 class Tracker final {
  public:
   explicit Tracker(Configuration configuration);
