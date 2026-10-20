@@ -27,7 +27,7 @@ struct Track {
 
 inline constexpr double kDefaultLostSeconds = 0.75;
 inline constexpr double kDefaultLowThreshold = 0.5;
-inline constexpr double kDefaultHighThreshold = 0.7;
+inline constexpr double kDefaultHighThreshold = 0.6;
 inline constexpr double kDefaultNewThreshold = 0.7;
 inline constexpr double kDefaultMatchThreshold = 0.8;
 inline constexpr std::size_t kDefaultTracks = 32;
