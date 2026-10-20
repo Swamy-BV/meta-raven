@@ -1,0 +1,36 @@
+[Unit]
+Description=Selected-target visual following (explicit activation)
+After=target-tracker.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+LogsDirectory=target-follower
+Environment=ROS_LOG_DIR=/var/log/target-follower
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=@ROS_PREFIX@/lib/target_follower/target-follower --ros-args --params-file /etc/target-follower.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=128M
+TasksMax=32
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target

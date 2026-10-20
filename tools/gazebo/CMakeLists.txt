@@ -16,3 +16,17 @@ add_library(GstCameraSystem SHARED vendor/GstCameraSystem.cpp)
 target_compile_features(GstCameraSystem PRIVATE cxx_std_17)
 target_link_libraries(GstCameraSystem PRIVATE gz-sim8::gz-sim8 gz-plugin2::gz-plugin2 PkgConfig::GSTREAMER
                                               Threads::Threads)
+
+set(PX4_SOURCE_DIR
+    ""
+    CACHE PATH "Firmware-matched PX4 checkout for flight simulation")
+if(PX4_SOURCE_DIR)
+  set(XRCE_DIR "${PX4_SOURCE_DIR}/build/px4_sitl_default/src/modules/uxrce_dds_client")
+  add_executable(simulation-clock clock.cpp)
+  target_compile_features(simulation-clock PRIVATE cxx_std_17)
+  target_compile_options(simulation-clock PRIVATE -Wall -Wextra -Werror)
+  target_include_directories(simulation-clock SYSTEM PRIVATE "${XRCE_DIR}/include")
+  target_link_libraries(
+    simulation-clock PRIVATE gz-sim8::gz-sim8 Threads::Threads "${XRCE_DIR}/lib/libmicroxrcedds_client.a"
+                             "${XRCE_DIR}/lib/libmicrocdr.a")
+endif()

@@ -15,6 +15,7 @@ rosidl_generate_interfaces(
   "srv/SetMediaMode.srv"
   "srv/SetMediaOutput.srv"
   "srv/SetCameraControls.srv"
+  "srv/SelectTarget.srv"
   "action/CapturePhotos.action"
   DEPENDENCIES
   std_msgs

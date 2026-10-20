@@ -1,0 +1,24 @@
+/raven/vehicle_1/autonomy/target_follower:
+  ros__parameters:
+    # Separate from the real M7 /fmu namespace. Service starts idle and never arms.
+    px4_namespace: /simulation
+    tracks_topic: /raven/vehicle_1/perception/tracks
+    camera_info_topic: /raven/vehicle_1/cameras/front/camera_info
+    labels_topic: /raven/vehicle_1/perception/label_info
+    metadata_topic: /raven/vehicle_1/perception/vision_info
+    follow_distance: 8.0
+    position_gain: 0.4
+    max_speed: 0.6
+    max_acceleration: 0.2
+    max_yaw_rate: 0.2
+    # Pause briefly; resume only the same ID. Expiration latches a hold.
+    target_timeout: 0.35
+    target_loss_timeout: 1.5
+    max_displacement: 30.0
+    max_target_range: 40.0
+    # Simulation mount/level-ground geometry; not physical-camera calibration.
+    ground_z: 0.24
+    camera_pitch: 0.3
+    camera_forward: 0.2
+    camera_right: 0.0
+    camera_down: -0.1

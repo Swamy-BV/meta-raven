@@ -1,5 +1,5 @@
 SUMMARY = "Raven ROS 2 service interfaces"
-DESCRIPTION = "ROS messages, services and actions for camera control, capture state"
+DESCRIPTION = "ROS messages, services and actions for camera control, capture state and target selection"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "devel"

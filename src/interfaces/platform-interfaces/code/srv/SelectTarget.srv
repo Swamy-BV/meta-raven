@@ -1,0 +1,5 @@
+# Select one currently visible person/car track; no automatic identity switching.
+string track_id
+---
+bool success
+string message

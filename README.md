@@ -34,6 +34,11 @@ physical flight with real sensors and actuators remains to be validated.
   TensorFlow Lite / ONNX inference and standard ROS vision outputs. Neutron NPU
   object detection has been exercised; acceleration depends on supported operators.
   Capture, recording and flight control remain separate components.
+- **Visual following prototype:** Standard ROS detections feed ByteTrack IDs,
+  explicit target selection and bounded offboard control. Detection, tracking
+  and following run on FRDM against PX4 SITL/Gazebo in WSL. Target-loss hold and
+  landing have been exercised; longer tracking through changing viewpoints
+  remains to be improved.
 - **Generative AI exploration:** On-board text generation and image question/
   answer experiments have produced responses. These remain experiments; VLM
   execution has required CPU fallback and is not a validated NPU-only pipeline.
@@ -51,6 +56,8 @@ flowchart LR
         video[MediaMTX]
         vision[vision-engine]
         tracker[target-tracker]
+        follower[target-follower]
+        simagent[Simulation DDS agent - temporary]
         agent[Micro XRCE-DDS Agent]
         router[mavlink-router]
         camera <-->|ROS controls / state / capture events| media
@@ -58,7 +65,12 @@ flowchart LR
         media -->|H.264 RTP| video
         media -->|ROS Image| vision
         vision -->|Detection2DArray| tracker
+        tracker -->|Selected track observations| follower
+        follower <-->|/simulation PX4 topics| simagent
     end
+    ros -->|Select target / enable following| follower
+    simagent <-->|uXRCE-DDS UDP| simulation[PX4 SITL + Gazebo - WSL]
+    simulation -->|H.264 RTP| media
     video -->|WebRTC| browser[Browser preview]
     media <-->|Image / CameraInfo / services / actions| ros[ROS applications]
     vision -->|ROS vision / metadata / health| ros
