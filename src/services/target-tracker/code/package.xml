@@ -5,7 +5,6 @@
   <description>Bounded class-aware image object tracking using ByteTrack.</description>
   <maintainer email="74085717+Swamy-BV@users.noreply.github.com">Raven maintainers</maintainer>
   <license>AGPL-3.0-only</license>
-  <license>MIT</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>rclcpp</depend>
   <depend>rcl_interfaces</depend>
@@ -13,6 +12,6 @@
   <depend>diagnostic_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>eigen</depend>
+  <depend>bytetrack</depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

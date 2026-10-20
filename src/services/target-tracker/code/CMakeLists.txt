@@ -13,11 +13,10 @@ find_package(vision_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(Eigen3 REQUIRED)
-add_subdirectory(vendor)
+find_package(ByteTrack 1.0 CONFIG REQUIRED)
 add_executable(target-tracker main.cpp core/tracker.cpp adapters/ros/node.cpp)
 target_include_directories(target-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(target-tracker bytetrack-core)
+target_link_libraries(target-tracker ByteTrack::ByteTrack)
 ament_target_dependencies(
   target-tracker
   SYSTEM
