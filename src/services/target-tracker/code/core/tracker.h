@@ -26,7 +26,7 @@ struct Track {
 };
 
 inline constexpr double kDefaultLostSeconds = 1.5;
-inline constexpr double kDefaultLowThreshold = 0.5;
+inline constexpr double kDefaultLowThreshold = 0.1;
 inline constexpr double kDefaultHighThreshold = 0.6;
 inline constexpr double kDefaultNewThreshold = 0.7;
 inline constexpr double kDefaultMatchThreshold = 0.8;

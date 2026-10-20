@@ -11,7 +11,10 @@
 #include <nlohmann/json.hpp>
 
 namespace detection {
-inline constexpr double kDefaultScoreThreshold = 0.5;
+// Keep weak observations for ByteTrack's second association pass. Consumers
+// choose their own acceptance threshold; new tracks still require strong
+// scores.
+inline constexpr double kDefaultScoreThreshold = 0.1;
 inline constexpr double kSuppressionIouThreshold = 0.45;
 inline constexpr size_t kMaxCandidates = 30000;
 inline constexpr size_t kMaxDetections = 100;

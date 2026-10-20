@@ -35,6 +35,7 @@
 
 #include "../core/decode.h"
 #include "../core/result.h"
+#include "../detection.h"
 #include "../inference_worker.h"
 #include <raven/contracts/camera.h>
 
@@ -695,7 +696,7 @@ void AddMetrics(raven::vision::Snapshot& snapshot, const Json& job) {
   if (job.is_null()) {
     return;
   }
-  snapshot.threshold = job.value("score_threshold", 0.0F);
+  snapshot.threshold = job.value("score_threshold", snapshot.threshold);
   for (const auto* key : {"preprocess_ms", "inference_ms", "model_load_ms",
                           "npu_partitions", "cpu_nodes"}) {
     if (job.contains(key)) {
@@ -849,6 +850,9 @@ Snapshot Engine::Poll(bool automatic) {
   impl_->UpdateLabels(status, *snapshot.identity);
   snapshot.labels = impl_->labels;
   snapshot.task = status.at("selected_model").at("task");
+  if (snapshot.task == "detection") {
+    snapshot.threshold = static_cast<float>(detection::kDefaultScoreThreshold);
+  }
   snapshot.result =
       Decode(status, static_cast<std::uint64_t>(g_get_monotonic_time()),
              impl_->max_age_us);
