@@ -1,0 +1,498 @@
+From: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+Subject: [PATCH] Bound tracker storage and predict with acquisition time
+
+Retain ByteTrack association while handling variable camera cadence, elapsed-time
+expiry, instance-owned IDs and bounded active/lost storage. Remove demo process
+execution and use exception-safe LAPJV allocation ownership. Replace the demo OpenCV rectangle
+type with an array; the tracking maths uses only Eigen and the standard library.
+
+Upstream-Status: Inappropriate [embedded specific]
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+diff --git a/deploy/TensorRT/cpp/include/BYTETracker.h b/deploy/TensorRT/cpp/include/BYTETracker.h
+index 1124800..2dafeb0 100644
+--- a/deploy/TensorRT/cpp/include/BYTETracker.h
++++ b/deploy/TensorRT/cpp/include/BYTETracker.h
+@@ -4,7 +4,7 @@
+ 
+ struct Object
+ {
+-    cv::Rect_<float> rect;
++    std::array<float, 4> rect;
+     int label;
+     float prob;
+ };
+@@ -12,11 +12,11 @@ struct Object
+ class BYTETracker
+ {
+ public:
+-	BYTETracker(int frame_rate = 30, int track_buffer = 30);
++	BYTETracker(double lost_seconds, int max_tracks, float track_threshold, float new_threshold, float match_threshold);
+ 	~BYTETracker();
+ 
+-	vector<STrack> update(const vector<Object>& objects);
+-	Scalar get_color(int idx);
++	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step);
++	size_t size() const { return tracked_stracks.size() + lost_stracks.size(); }
+ 
+ private:
+ 	vector<STrack*> joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb);
+@@ -40,10 +40,11 @@ private:
+ 	float high_thresh;
+ 	float match_thresh;
+ 	int frame_id;
+-	int max_time_lost;
++	double max_time_lost;
++	int max_tracks_;
++	int next_id_ = 0;
+ 
+ 	vector<STrack> tracked_stracks;
+ 	vector<STrack> lost_stracks;
+-	vector<STrack> removed_stracks;
+ 	byte_kalman::KalmanFilter kalman_filter;
+ };
+\ No newline at end of file
+diff --git a/deploy/TensorRT/cpp/include/STrack.h b/deploy/TensorRT/cpp/include/STrack.h
+index 4bd9d00..892905c 100644
+--- a/deploy/TensorRT/cpp/include/STrack.h
++++ b/deploy/TensorRT/cpp/include/STrack.h
+@@ -1,9 +1,14 @@
+ #pragma once
+ 
+-#include <opencv2/opencv.hpp>
++#include <algorithm>
++#include <array>
++#include <climits>
++#include <cmath>
++#include <iostream>
++#include <map>
++#include <vector>
+ #include "kalmanFilter.h"
+ 
+-using namespace cv;
+ using namespace std;
+ 
+ enum TrackState { New = 0, Tracked, Lost, Removed };
+@@ -15,18 +20,17 @@ public:
+ 	~STrack();
+ 
+ 	vector<float> static tlbr_to_tlwh(vector<float> &tlbr);
+-	void static multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter);
++	void static multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter, float step);
+ 	void static_tlwh();
+ 	void static_tlbr();
+ 	vector<float> tlwh_to_xyah(vector<float> tlwh_tmp);
+ 	vector<float> to_xyah();
+ 	void mark_lost();
+ 	void mark_removed();
+-	int next_id();
+ 	int end_frame();
+ 	
+-	void activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id);
+-	void re_activate(STrack &new_track, int frame_id, bool new_id = false);
++	void activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id, int assigned_id);
++	void re_activate(STrack &new_track, int frame_id);
+ 	void update(STrack &new_track, int frame_id);
+ 
+ public:
+@@ -44,6 +48,7 @@ public:
+ 	KAL_MEAN mean;
+ 	KAL_COVA covariance;
+ 	float score;
++	double last_seen_seconds = 0;
+ 
+ private:
+ 	byte_kalman::KalmanFilter kalman_filter;
+diff --git a/deploy/TensorRT/cpp/include/kalmanFilter.h b/deploy/TensorRT/cpp/include/kalmanFilter.h
+index 124b75f..7f0dba8 100644
+--- a/deploy/TensorRT/cpp/include/kalmanFilter.h
++++ b/deploy/TensorRT/cpp/include/kalmanFilter.h
+@@ -10,7 +10,7 @@ namespace byte_kalman
+ 		static const double chi2inv95[10];
+ 		KalmanFilter();
+ 		KAL_DATA initiate(const DETECTBOX& measurement);
+-		void predict(KAL_MEAN& mean, KAL_COVA& covariance);
++		void predict(KAL_MEAN& mean, KAL_COVA& covariance, float step);
+ 		KAL_HDATA project(const KAL_MEAN& mean, const KAL_COVA& covariance);
+ 		KAL_DATA update(const KAL_MEAN& mean,
+ 			const KAL_COVA& covariance,
+diff --git a/deploy/TensorRT/cpp/include/lapjv.h b/deploy/TensorRT/cpp/include/lapjv.h
+index 82096b8..0752234 100644
+--- a/deploy/TensorRT/cpp/include/lapjv.h
++++ b/deploy/TensorRT/cpp/include/lapjv.h
+@@ -1,5 +1,7 @@
+ #ifndef LAPJV_H
+ #define LAPJV_H
++#include <memory>
++#include <stdexcept>
+ 
+ #define LARGE 1000000
+ 
+@@ -10,8 +12,8 @@
+ #define FALSE 0
+ #endif
+ 
+-#define NEW(x, t, n) if ((x = (t *)malloc(sizeof(t) * (n))) == 0) { return -1; }
+-#define FREE(x) if (x != 0) { free(x); x = 0; }
++#define NEW(x, t, n) auto x##_owner = std::make_unique<t[]>(n); x = x##_owner.get()
++#define FREE(x) x##_owner.reset(); x = nullptr
+ #define SWAP_INDICES(a, b) { int_t _temp_index = a; a = b; b = _temp_index; }
+ 
+ #if 0
+diff --git a/deploy/TensorRT/cpp/src/BYTETracker.cpp b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+index 7e036e9..54b3345 100644
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -1,26 +1,36 @@
+ #include "BYTETracker.h"
+-#include <fstream>
++#include <algorithm>
++#include <limits>
++#include <stdexcept>
+ 
+-BYTETracker::BYTETracker(int frame_rate, int track_buffer)
++BYTETracker::BYTETracker(double lost_seconds, int max_tracks, float track_threshold, float new_threshold, float match_threshold)
+ {
+-	track_thresh = 0.5;
+-	high_thresh = 0.6;
+-	match_thresh = 0.8;
++	track_thresh = track_threshold;
++	high_thresh = new_threshold;
++	match_thresh = match_threshold;
+ 
+ 	frame_id = 0;
+-	max_time_lost = int(frame_rate / 30.0 * track_buffer);
+-	cout << "Init ByteTrack!" << endl;
++	max_time_lost = lost_seconds;
++	max_tracks_ = max_tracks;
+ }
+ 
+ BYTETracker::~BYTETracker()
+ {
+ }
+ 
+-vector<STrack> BYTETracker::update(const vector<Object>& objects)
++vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step)
+ {
+ 
+ 	////////////////// Step 1: Get detections //////////////////
+-	this->frame_id++;
++	if (frame_id == std::numeric_limits<int>::max())
++        throw std::overflow_error("ByteTrack frame counter exhausted; reset required");
++    this->frame_id++;
++    // Expire before matching so an old identity cannot be resurrected after TTL.
++    const auto expired = [this, stamp_seconds](const STrack& track) {
++        return stamp_seconds - track.last_seen_seconds > max_time_lost;
++    };
++    tracked_stracks.erase(std::remove_if(tracked_stracks.begin(), tracked_stracks.end(), expired), tracked_stracks.end());
++    lost_stracks.erase(std::remove_if(lost_stracks.begin(), lost_stracks.end(), expired), lost_stracks.end());
+ 	vector<STrack> activated_stracks;
+ 	vector<STrack> refind_stracks;
+ 	vector<STrack> removed_stracks;
+@@ -44,10 +54,10 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 		{
+ 			vector<float> tlbr_;
+ 			tlbr_.resize(4);
+-			tlbr_[0] = objects[i].rect.x;
+-			tlbr_[1] = objects[i].rect.y;
+-			tlbr_[2] = objects[i].rect.x + objects[i].rect.width;
+-			tlbr_[3] = objects[i].rect.y + objects[i].rect.height;
++			tlbr_[0] = objects[i].rect[0];
++			tlbr_[1] = objects[i].rect[1];
++			tlbr_[2] = objects[i].rect[0] + objects[i].rect[2];
++			tlbr_[3] = objects[i].rect[1] + objects[i].rect[3];
+ 
+ 			float score = objects[i].prob;
+ 
+@@ -75,7 +85,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 
+ 	////////////////// Step 2: First association, with IoU //////////////////
+ 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
+-	STrack::multi_predict(strack_pool, this->kalman_filter);
++	STrack::multi_predict(strack_pool, this->kalman_filter, step);
+ 
+ 	vector<vector<float> > dists;
+ 	int dist_size = 0, dist_size_size = 0;
+@@ -92,11 +102,13 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 		if (track->state == TrackState::Tracked)
+ 		{
+ 			track->update(*det, this->frame_id);
++            track->last_seen_seconds = stamp_seconds;
+ 			activated_stracks.push_back(*track);
+ 		}
+ 		else
+ 		{
+-			track->re_activate(*det, this->frame_id, false);
++			track->re_activate(*det, this->frame_id);
++            track->last_seen_seconds = stamp_seconds;
+ 			refind_stracks.push_back(*track);
+ 		}
+ 	}
+@@ -132,11 +144,13 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 		if (track->state == TrackState::Tracked)
+ 		{
+ 			track->update(*det, this->frame_id);
++            track->last_seen_seconds = stamp_seconds;
+ 			activated_stracks.push_back(*track);
+ 		}
+ 		else
+ 		{
+-			track->re_activate(*det, this->frame_id, false);
++			track->re_activate(*det, this->frame_id);
++            track->last_seen_seconds = stamp_seconds;
+ 			refind_stracks.push_back(*track);
+ 		}
+ 	}
+@@ -166,6 +180,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 	for (int i = 0; i < matches.size(); i++)
+ 	{
+ 		unconfirmed[matches[i][0]]->update(detections[matches[i][1]], this->frame_id);
++        unconfirmed[matches[i][0]]->last_seen_seconds = stamp_seconds;
+ 		activated_stracks.push_back(*unconfirmed[matches[i][0]]);
+ 	}
+ 
+@@ -182,14 +197,20 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 		STrack *track = &detections[u_detection[i]];
+ 		if (track->score < this->high_thresh)
+ 			continue;
+-		track->activate(this->kalman_filter, this->frame_id);
++		// Reserve bounded storage for both visible and temporarily lost tracks.
++        if (this->tracked_stracks.size() + this->lost_stracks.size() + activated_stracks.size() >= static_cast<size_t>(max_tracks_))
++            break;
++        if (next_id_ == std::numeric_limits<int>::max())
++            throw std::overflow_error("ByteTrack ID counter exhausted; reset required");
++        track->activate(this->kalman_filter, this->frame_id, ++next_id_);
++        track->last_seen_seconds = stamp_seconds;
+ 		activated_stracks.push_back(*track);
+ 	}
+ 
+ 	////////////////// Step 5: Update state //////////////////
+ 	for (int i = 0; i < this->lost_stracks.size(); i++)
+ 	{
+-		if (this->frame_id - this->lost_stracks[i].end_frame() > this->max_time_lost)
++		if (stamp_seconds - this->lost_stracks[i].last_seen_seconds > this->max_time_lost)
+ 		{
+ 			this->lost_stracks[i].mark_removed();
+ 			removed_stracks.push_back(this->lost_stracks[i]);
+@@ -217,11 +238,8 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
+ 		this->lost_stracks.push_back(lost_stracks[i]);
+ 	}
+ 
+-	this->lost_stracks = sub_stracks(this->lost_stracks, this->removed_stracks);
+-	for (int i = 0; i < removed_stracks.size(); i++)
+-	{
+-		this->removed_stracks.push_back(removed_stracks[i]);
+-	}
++	// Removed tracks are needed only during this update, never as a history.
++    this->lost_stracks = sub_stracks(this->lost_stracks, removed_stracks);
+ 	
+ 	remove_duplicate_stracks(resa, resb, this->tracked_stracks, this->lost_stracks);
+ 
+diff --git a/deploy/TensorRT/cpp/src/STrack.cpp b/deploy/TensorRT/cpp/src/STrack.cpp
+index 0e8653e..ab46e4c 100644
+--- a/deploy/TensorRT/cpp/src/STrack.cpp
++++ b/deploy/TensorRT/cpp/src/STrack.cpp
+@@ -24,10 +24,10 @@ STrack::~STrack()
+ {
+ }
+ 
+-void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
++void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id, int assigned_id)
+ {
+ 	this->kalman_filter = kalman_filter;
+-	this->track_id = this->next_id();
++	this->track_id = assigned_id;
+ 
+ 	vector<float> _tlwh_tmp(4);
+ 	_tlwh_tmp[0] = this->_tlwh[0];
+@@ -58,7 +58,7 @@ void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
+ 	this->start_frame = frame_id;
+ }
+ 
+-void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
++void STrack::re_activate(STrack &new_track, int frame_id)
+ {
+ 	vector<float> xyah = tlwh_to_xyah(new_track.tlwh);
+ 	DETECTBOX xyah_box;
+@@ -78,8 +78,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
+ 	this->is_activated = true;
+ 	this->frame_id = frame_id;
+ 	this->score = new_track.score;
+-	if (new_id)
+-		this->track_id = next_id();
++
+ }
+ 
+ void STrack::update(STrack &new_track, int frame_id)
+@@ -167,19 +166,12 @@ void STrack::mark_removed()
+ 	state = TrackState::Removed;
+ }
+ 
+-int STrack::next_id()
+-{
+-	static int _count = 0;
+-	_count++;
+-	return _count;
+-}
+-
+ int STrack::end_frame()
+ {
+ 	return this->frame_id;
+ }
+ 
+-void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter)
++void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter, float step)
+ {
+ 	for (int i = 0; i < stracks.size(); i++)
+ 	{
+@@ -187,7 +179,7 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &
+ 		{
+ 			stracks[i]->mean[7] = 0;
+ 		}
+-		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance);
++		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, step);
+ 		stracks[i]->static_tlwh();
+ 		stracks[i]->static_tlbr();
+ 	}
+diff --git a/deploy/TensorRT/cpp/src/kalmanFilter.cpp b/deploy/TensorRT/cpp/src/kalmanFilter.cpp
+index ffffd82..14d4b4e 100644
+--- a/deploy/TensorRT/cpp/src/kalmanFilter.cpp
++++ b/deploy/TensorRT/cpp/src/kalmanFilter.cpp
+@@ -1,5 +1,7 @@
+ #include "kalmanFilter.h"
+ #include <Eigen/Cholesky>
++#include <cmath>
++#include <stdexcept>
+ 
+ namespace byte_kalman
+ {
+@@ -57,9 +59,12 @@ namespace byte_kalman
+ 		return std::make_pair(mean, var);
+ 	}
+ 
+-	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance)
++	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance, float step)
+ 	{
+-		//revise the data;
++        // Keep upstream velocity units (nominal 30-Hz frames), but use actual elapsed time.
++        for (int i = 0; i < 4; ++i) _motion_mat(i, 4 + i) = step;
++        // Diffusion grows with elapsed time, including skipped source frames.
++
+ 		DETECTBOX std_pos;
+ 		std_pos << _std_weight_position * mean(3),
+ 			_std_weight_position * mean(3),
+@@ -75,6 +80,7 @@ namespace byte_kalman
+ 		tmp.block<1, 4>(0, 4) = std_vel;
+ 		tmp = tmp.array().square();
+ 		KAL_COVA motion_cov = tmp.asDiagonal();
++        motion_cov *= step;
+ 		KAL_MEAN mean1 = this->_motion_mat * mean.transpose();
+ 		KAL_COVA covariance1 = this->_motion_mat * covariance *(_motion_mat.transpose());
+ 		covariance1 += motion_cov;
+@@ -131,8 +137,7 @@ namespace byte_kalman
+ 	{
+ 		KAL_HDATA pa = this->project(mean, covariance);
+ 		if (only_position) {
+-			printf("not implement!");
+-			exit(0);
++			throw std::invalid_argument("position-only gating is not implemented");
+ 		}
+ 		KAL_HMEAN mean1 = pa.first;
+ 		KAL_HCOVA covariance1 = pa.second;
+diff --git a/deploy/TensorRT/cpp/src/lapjv.cpp b/deploy/TensorRT/cpp/src/lapjv.cpp
+index 0ed0096..97a09db 100644
+--- a/deploy/TensorRT/cpp/src/lapjv.cpp
++++ b/deploy/TensorRT/cpp/src/lapjv.cpp
+@@ -307,7 +307,7 @@ int_t _ca_dense(
+ 			SWAP_INDICES(j, x[i]);
+ 			k++;
+ 			if (k >= n) {
+-				ASSERT(FALSE);
++				throw std::runtime_error("assignment augmenting path did not terminate");
+ 			}
+ 		}
+ 	}
+diff --git a/deploy/TensorRT/cpp/src/utils.cpp b/deploy/TensorRT/cpp/src/utils.cpp
+index eac5e1b..41f1ed9 100644
+--- a/deploy/TensorRT/cpp/src/utils.cpp
++++ b/deploy/TensorRT/cpp/src/utils.cpp
+@@ -1,5 +1,6 @@
+ #include "BYTETracker.h"
+ #include "lapjv.h"
++#include <stdexcept>
+ 
+ vector<STrack*> BYTETracker::joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb)
+ {
+@@ -285,9 +286,7 @@ double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowso
+ 	{
+ 		if (!extend_cost)
+ 		{
+-			cout << "set extend_cost=True" << endl;
+-			system("pause");
+-			exit(0);
++			throw std::invalid_argument("non-square assignment requires extended costs");
+ 		}
+ 	}
+ 		
+@@ -347,29 +346,17 @@ double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowso
+ 		cost_c.assign(cost_c_extended.begin(), cost_c_extended.end());
+ 	}
+ 
+-	double **cost_ptr;
+-	cost_ptr = new double *[sizeof(double *) * n];
+-	for (int i = 0; i < n; i++)
+-		cost_ptr[i] = new double[sizeof(double) * n];
+-
+-	for (int i = 0; i < n; i++)
+-	{
+-		for (int j = 0; j < n; j++)
+-		{
+-			cost_ptr[i][j] = cost_c[i][j];
+-		}
+-	}
+-
+-	int* x_c = new int[sizeof(int) * n];
+-	int *y_c = new int[sizeof(int) * n];
+-
+-	int ret = lapjv_internal(n, cost_ptr, x_c, y_c);
+-	if (ret != 0)
+-	{
+-		cout << "Calculate Wrong!" << endl;
+-		system("pause");
+-		exit(0);
+-	}
++    vector<vector<double>> cost_storage(n, vector<double>(n));
++    vector<double*> cost_rows;
++    cost_rows.reserve(n);
++    for (int i = 0; i < n; ++i) {
++        std::copy(cost_c[i].begin(), cost_c[i].end(), cost_storage[i].begin());
++        cost_rows.push_back(cost_storage[i].data());
++    }
++    auto cost_ptr = cost_rows.data();
++    vector<int> x_c(n), y_c(n);
++    if (lapjv_internal(n, cost_ptr, x_c.data(), y_c.data()) != 0)
++        throw std::runtime_error("linear assignment failed");
+ 
+ 	double opt = 0.0;
+ 
+@@ -411,19 +398,6 @@ double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowso
+ 		}
+ 	}
+ 
+-	for (int i = 0; i < n; i++)
+-	{
+-		delete[]cost_ptr[i];
+-	}
+-	delete[]cost_ptr;
+-	delete[]x_c;
+-	delete[]y_c;
+-
+ 	return opt;
+ }
+ 
+-Scalar BYTETracker::get_color(int idx)
+-{
+-	idx += 3;
+-	return Scalar(37 * idx % 255, 17 * idx % 255, 29 * idx % 255);
+-}
+\ No newline at end of file

@@ -1,0 +1,36 @@
+[Unit]
+Description=ROS image object tracking
+After=vision-engine.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+LogsDirectory=target-tracker
+Environment=ROS_LOG_DIR=/var/log/target-tracker
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=@ROS_PREFIX@/lib/target_tracker/target-tracker --ros-args --params-file /etc/target-tracker.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=128M
+TasksMax=32
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target

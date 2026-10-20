@@ -39,6 +39,7 @@ IMAGE_INSTALL:append = " \
     neo-ipa-uguzzi \
     kernel-module-imx477 \
     vision-engine \
+    target-tracker \
 "
 
 # Publish a block map with the compressed factory WIC for bmaptool and UUU.
