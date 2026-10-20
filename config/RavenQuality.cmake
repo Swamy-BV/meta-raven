@@ -72,6 +72,20 @@ if(RAVEN_QUALITY_FORMAT)
     COMMENT "Checking C++ formatting"
     VERBATIM)
 endif()
+# Clang tools need their own intrinsic headers before GCC's target includes.
+# libstdc++ still comes from the target sysroot; GCC ARM NEON builtins cannot
+# be parsed by Clang when Eigen enables vectorization.
+if(RAVEN_QUALITY_TIDY OR RAVEN_QUALITY_IWYU)
+  find_program(RAVEN_CLANG clang REQUIRED)
+  execute_process(
+    COMMAND "${RAVEN_CLANG}" -print-resource-dir
+    RESULT_VARIABLE _raven_resource_result
+    OUTPUT_VARIABLE _raven_resource_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT _raven_resource_result STREQUAL "0" OR NOT IS_DIRECTORY "${_raven_resource_dir}/include")
+    message(FATAL_ERROR "Cannot locate the Yocto Clang intrinsic headers")
+  endif()
+endif()
 if(RAVEN_QUALITY_TIDY)
   find_program(RAVEN_CLANG_TIDY clang-tidy REQUIRED)
   execute_process(
@@ -84,7 +98,7 @@ if(RAVEN_QUALITY_TIDY)
   endif()
   set(CMAKE_CXX_CLANG_TIDY "${RAVEN_CLANG_TIDY}" "--config-file=${_raven_config}/.clang-tidy"
                            "--header-filter=^${PROJECT_SOURCE_DIR}/|/raven/contracts/" --system-headers)
-  list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-Wthread-safety")
+  list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-Wthread-safety" "--extra-arg=-isystem${_raven_resource_dir}/include")
   # Clang must see the target GCC's standard library, not the host's headers.
   foreach(dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
     list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-isystem${dir}")
@@ -142,7 +156,8 @@ if(RAVEN_QUALITY_IWYU)
       -Xiwyu
       "--mapping_file=${_raven_config}/iwyu.imp"
       -Xiwyu
-      "--check_also=${PROJECT_SOURCE_DIR}/*")
+      "--check_also=${PROJECT_SOURCE_DIR}/*"
+      "-isystem${_raven_resource_dir}/include")
   foreach(dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
     list(APPEND CMAKE_CXX_INCLUDE_WHAT_YOU_USE "-isystem${dir}")
   endforeach()
