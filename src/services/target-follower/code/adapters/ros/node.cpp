@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -16,6 +17,7 @@
 
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
+#include <rclcpp/logging.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/time.hpp>
 
@@ -26,6 +28,7 @@
 
 namespace raven::following {
 namespace {
+constexpr auto kNanosPerMillisecond = 1000000.0;
 constexpr auto kPeriod = std::chrono::milliseconds(50);
 constexpr double kDt = 0.05;
 constexpr double kTelemetryTimeout = 0.5;
@@ -207,6 +210,12 @@ void FollowingNode::Connect() {
   control_timer_ = create_wall_timer(kPeriod, [this] { Tick(); });
   health_timer_ =
       create_wall_timer(std::chrono::seconds(1), [this] { PublishHealth(); });
+}
+
+bool FollowingNode::FreshTarget() const {
+  const auto age = static_cast<double>(now().nanoseconds() - target_stamp_ns_) /
+                   kNanoseconds;
+  return age >= -kFutureTolerance && age <= timeout_seconds_;
 }
 
 bool FollowingNode::FreshTracks() const {
@@ -406,6 +415,7 @@ void FollowingNode::ReceiveTracks(
     return;
   }
   target_ = projection.point;
+  target_stamp_ns_ = rclcpp::Time(message.header.stamp).nanoseconds();
   last_rejection_.clear();
   last_target_ = Clock::now();
   ++observations_used_;
@@ -492,6 +502,7 @@ void FollowingNode::EnableFollowing(const Enable::Request& request,
   hold_position_ = origin_;
   command_ = {{0, 0, 0}, Heading(LatestPose().orientation)};
   last_target_ = Clock::now();
+  target_stamp_ns_ = rclcpp::Time(tracks_.header.stamp).nanoseconds();
   enabled_ = true;
   streaming_ = true;
   state_ = "following";
@@ -538,7 +549,7 @@ void FollowingNode::Tick() {
     Hold(
         "Selected identity expired; holding until explicit selection and "
         "enable");
-  } else if (enabled_ && target_age > timeout_seconds_) {
+  } else if (enabled_ && (target_age > timeout_seconds_ || !FreshTarget())) {
     WaitForTarget();
   } else if (enabled_) {
     state_ = "following";
@@ -594,8 +605,23 @@ void FollowingNode::PublishCommand() {
   setpoint.jerk = {nan, nan, nan};
   setpoint.yaw = static_cast<float>(command_.yaw);
   setpoint.yawspeed = nan;
+  // Hold commands do not consume a perception observation.
+  TraceFrame(moving ? target_stamp_ns_ : 0);
   setpoint_->publish(setpoint);
   ++setpoints_sent_;
+}
+
+// This single ROS logging macro expands to many generated control statements.
+// NOLINTNEXTLINE(readability-function-size)
+void FollowingNode::TraceFrame(std::int64_t source_stamp_ns) const {
+  RCLCPP_DEBUG(get_logger(),
+               "timing stage=setpoint source_ns=%" PRId64 " ros_ns=%" PRId64
+               " steady_ns=%" PRId64,
+               source_stamp_ns, now().nanoseconds(),
+               static_cast<std::int64_t>(
+                   std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                       .count()));
 }
 
 void FollowingNode::PublishHealth() {
@@ -621,6 +647,13 @@ void FollowingNode::PublishHealth() {
   add("observations_used", std::to_string(observations_used_));
   add("rejected_observations", std::to_string(rejected_observations_));
   add("last_rejection", last_rejection_);
+  add("source_stamp_ns", std::to_string(target_stamp_ns_));
+  if (target_stamp_ns_ > 0) {
+    add("source_age_ms",
+        std::to_string(
+            static_cast<double>(now().nanoseconds() - target_stamp_ns_) /
+            kNanosPerMillisecond));
+  }
   if (target_ && position_) {
     const auto range = std::hypot(
         target_.value()[0] - static_cast<double>(position_.value().x),

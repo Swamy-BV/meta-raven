@@ -40,6 +40,7 @@ class TrackingNode final : public rclcpp::Node {
                const std_msgs::msg::Header& header);
   void Tick();
   void Reset(const std::string& reason);
+  void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth();
   Configuration config_;
   double input_timeout_seconds_ = 0;

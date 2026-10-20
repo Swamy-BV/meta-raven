@@ -69,6 +69,21 @@ void RestoreOrigin(GstBuffer* buffer, raven::contracts::CameraFrame& frame) {
   frame.optical_frame = optical_frame;
 }
 
+void RestoreRtpOrigin(GstBuffer* buffer, raven::contracts::CameraFrame& frame) {
+  constexpr auto kNtpUnixOffset = 2208988800ULL * GST_SECOND;
+  const Caps reference(gst_caps_new_empty_simple("timestamp/x-ntp"),
+                       gst_caps_unref);
+  const auto* origin =
+      gst_buffer_get_reference_timestamp_meta(buffer, reference.get());
+  if (!origin || origin->timestamp <= kNtpUnixOffset) {
+    throw std::runtime_error("RTP capture timestamp is missing or invalid");
+  }
+  // The sender and ROS nodes must share a clock domain. In simulation this is
+  // simulated Unix-epoch time; physical senders require synchronized UTC
+  // clocks.
+  frame.source_stamp_ns = origin->timestamp - kNtpUnixOffset;
+}
+
 std::string MessageError(GstMessage* message) {
   GError* error = nullptr;
   gchar* debug = nullptr;
@@ -215,6 +230,9 @@ class GstreamerBackend::Impl {
     frame.sequence = ++sequence;
     if (settings.source.kind == "ros") {
       RestoreOrigin(gst_sample_get_buffer(sample.get()), frame);
+    } else if (settings.source.kind == "rtp" &&
+               settings.source.rtp_capture_timestamps) {
+      RestoreRtpOrigin(gst_sample_get_buffer(sample.get()), frame);
     }
     return frame;
   }

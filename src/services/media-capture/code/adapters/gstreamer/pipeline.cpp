@@ -27,6 +27,21 @@ std::string Quote(const std::string& text) {
   return result + "\"";
 }
 
+std::string RtpSource(const Source& source) {
+  const std::string extension =
+      source.rtp_capture_timestamps
+          ? ",extmap-1=urn:ietf:params:rtp-hdrext:ntp-64"
+          : "";
+  return "udpsrc buffer-size=4194304 uri=" + Quote(source.uri) +
+         " "
+         "caps=\"application/x-rtp,media=video,encoding-name=H264,"
+         "clock-rate=90000,payload=96" +
+         extension +
+         "\" ! rtpjitterbuffer latency=100 "
+         "drop-on-latency=true ! rtph264depay ! h264parse ! "
+         "v4l2h264dec capture-io-mode=dmabuf";
+}
+
 std::string SourceGraph(const Settings& settings) {
   const auto& source = settings.source;
   if (source.kind == "test") {
@@ -55,12 +70,7 @@ std::string SourceGraph(const Settings& settings) {
            " ! decodebin";
   }
   if (source.kind == "rtp") {
-    return "udpsrc buffer-size=4194304 uri=" + Quote(source.uri) +
-           " "
-           "caps=\"application/x-rtp,media=video,encoding-name=H264,"
-           "clock-rate=90000,payload=96\" ! rtpjitterbuffer latency=100 "
-           "drop-on-latency=true ! rtph264depay ! h264parse ! "
-           "v4l2h264dec capture-io-mode=dmabuf";
+    return RtpSource(source);
   }
   if (source.kind == "image") {
     return "filesrc location=" + Quote(source.uri) +

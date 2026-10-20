@@ -74,6 +74,8 @@ Settings MediaCaptureNode::ReadSettings() {
   settings.source.height =
       Parameter(*this, "source_height", settings.source.height);
   settings.source.loop = Parameter(*this, "loop", settings.source.loop);
+  settings.source.rtp_capture_timestamps = Parameter(
+      *this, "rtp_capture_timestamps", settings.source.rtp_capture_timestamps);
   settings.converter = Parameter(*this, "converter", settings.converter);
   settings.output_dir = Parameter(*this, "output_dir", settings.output_dir);
   settings.stream_host = Parameter(*this, "stream_host", settings.stream_host);

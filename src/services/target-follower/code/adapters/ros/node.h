@@ -62,12 +62,14 @@ class FollowingNode final : public rclcpp::Node {
                        Enable::Response& response);
   [[nodiscard]] bool FreshTelemetry() const;
   [[nodiscard]] bool FreshTracks() const;
+  [[nodiscard]] bool FreshTarget() const;
   [[nodiscard]] Pose LatestPose() const;
   [[nodiscard]] Projection TargetPoint(
       const vision_msgs::msg::Detection2D& detection) const;
   void Tick();
   void Hold(const std::string& reason);
   void PublishCommand();
+  void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth();
 
   Configuration config_;
@@ -79,6 +81,7 @@ class FollowingNode final : public rclcpp::Node {
   std::string reason_ = "Select a visible person or car";
   double timeout_seconds_ = 0;
   double loss_timeout_seconds_ = 0;
+  std::int64_t target_stamp_ns_ = 0;
   std::int64_t model_stamp_ = 0;
   std::int64_t label_stamp_ = 0;
   std::set<std::string> supported_classes_;

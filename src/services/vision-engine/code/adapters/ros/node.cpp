@@ -2,6 +2,7 @@
 #include "node.h"
 
 #include <chrono>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -16,6 +17,7 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "std_msgs/msg/header.hpp"
+#include <rclcpp/logging.hpp>
 #include <rclcpp/parameter.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/time.hpp>
@@ -249,6 +251,7 @@ void VisionNode::PublishResult(const Result& result,
     for (const auto& value : result.classification) {
       message.results.push_back(HypothesisMessage(value, labels));
     }
+    TraceFrame(static_cast<std::int64_t>(result.stamp_ns));
     classification_->publish(message);
   } else {
     vision_msgs::msg::Detection2DArray message;
@@ -256,9 +259,23 @@ void VisionNode::PublishResult(const Result& result,
     for (const auto& value : result.detections) {
       message.detections.push_back(DetectionMessage(value, header, labels));
     }
+    TraceFrame(static_cast<std::int64_t>(result.stamp_ns));
     detections_->publish(message);
   }
   result_key_ = key;
+}
+
+// This single ROS logging macro expands to many generated control statements.
+// NOLINTNEXTLINE(readability-function-size)
+void VisionNode::TraceFrame(std::int64_t source_stamp_ns) const {
+  RCLCPP_DEBUG(get_logger(),
+               "timing stage=inference source_ns=%" PRId64 " ros_ns=%" PRId64
+               " steady_ns=%" PRId64,
+               source_stamp_ns, now().nanoseconds(),
+               static_cast<std::int64_t>(
+                   std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                       .count()));
 }
 
 void VisionNode::PublishHealth(const std::string& text, bool failed, bool fresh,

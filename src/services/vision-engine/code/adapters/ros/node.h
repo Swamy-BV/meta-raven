@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -39,6 +40,7 @@ class VisionNode final : public rclcpp::Node {
   void PublishMetadata(const Snapshot& snapshot);
   void PublishResult(const Result& result,
                      const std::vector<std::string>& labels);
+  void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth(const std::string& text, bool failed, bool fresh,
                      const Snapshot& snapshot);
   // Engine joins the job thread before the frame provider is destroyed.

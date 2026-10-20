@@ -39,6 +39,8 @@ struct Source {
   int width = 0;
   int height = 0;
   bool loop = false;
+  // Opt-in RFC6051 capture time in the active ROS clock domain.
+  bool rtp_capture_timestamps = false;
 };
 
 struct Controls {

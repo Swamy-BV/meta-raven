@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -60,6 +61,7 @@ class MediaCaptureNode final : public rclcpp::Node {
   void PublishState();
   void PublishCapabilities();
   void PublishPhoto(const Photo& photo);
+  void TraceFrame(std::int64_t source_stamp_ns) const;
   [[nodiscard]] bool MapNativeStamp(std_msgs::msg::Header& header) const;
   void Tick();
   [[nodiscard]] Settings ReadSettings();

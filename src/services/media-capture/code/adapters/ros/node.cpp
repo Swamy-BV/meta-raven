@@ -5,6 +5,7 @@
 #include <rmw/qos_profiles.h>
 
 #include <chrono>
+#include <cinttypes>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -323,7 +324,21 @@ void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
     info = calibration_;
     info.header = image.header;
   }
+  TraceFrame(rclcpp::Time(image.header.stamp).nanoseconds());
   images_.publish(image, info);
+}
+
+// This single ROS logging macro expands to many generated control statements.
+// NOLINTNEXTLINE(readability-function-size)
+void MediaCaptureNode::TraceFrame(std::int64_t source_stamp_ns) const {
+  RCLCPP_DEBUG(get_logger(),
+               "timing stage=capture source_ns=%" PRId64 " ros_ns=%" PRId64
+               " steady_ns=%" PRId64,
+               source_stamp_ns, now().nanoseconds(),
+               static_cast<std::int64_t>(
+                   std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                       .count()));
 }
 
 bool MediaCaptureNode::MapNativeStamp(std_msgs::msg::Header& header) const {

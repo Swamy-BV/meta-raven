@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "std_msgs/msg/header.hpp"
+#include <rclcpp/logging.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/time.hpp>
 
@@ -252,6 +254,7 @@ void TrackingNode::Publish(const std::vector<Track>& tracks,
     message.detections.push_back(TrackMessage(track, header));
   }
   published_count_ = message.detections.size();
+  TraceFrame(rclcpp::Time(header.stamp).nanoseconds());
   output_->publish(message);
 }
 
@@ -277,6 +280,19 @@ void TrackingNode::Tick() {
     Reset("Detection input timed out; tracks cleared");
   }
   PublishHealth();
+}
+
+// This single ROS logging macro expands to many generated control statements.
+// NOLINTNEXTLINE(readability-function-size)
+void TrackingNode::TraceFrame(std::int64_t source_stamp_ns) const {
+  RCLCPP_DEBUG(get_logger(),
+               "timing stage=tracking source_ns=%" PRId64 " ros_ns=%" PRId64
+               " steady_ns=%" PRId64,
+               source_stamp_ns, now().nanoseconds(),
+               static_cast<std::int64_t>(
+                   std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                       .count()));
 }
 
 void TrackingNode::PublishHealth() {
