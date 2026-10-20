@@ -22,6 +22,7 @@ DEPENDS = "\
 SRC_URI = "\
     git://github.com/FoundationVision/ByteTrack.git;protocol=https;branch=main;destsuffix=bytetrack \
     file://0001-bound-tracking-and-use-acquisition-time.patch;patchdir=${UNPACKDIR}/bytetrack \
+    file://0002-recover-retained-identities-with-weak-observations.patch;patchdir=${UNPACKDIR}/bytetrack \
     file://target-tracker.service \
     file://target-tracker.yaml \
 "

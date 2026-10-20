@@ -8,7 +8,8 @@
     input_timeout_seconds: 0.75
     # Weak boxes may maintain an established ID; new IDs still require 0.7.
     low_threshold: 0.1
-    high_threshold: 0.6
+    # Moderate detections can reacquire a recently lost ID; creation stays strict.
+    high_threshold: 0.5
     new_threshold: 0.7
     match_threshold: 0.8
     max_tracks_per_class: 32

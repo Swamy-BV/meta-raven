@@ -1,0 +1,28 @@
+From: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+Subject: [PATCH] Recover retained identities with overlapping weak observations
+
+A single missed detection moves an identity to Lost. Upstream excludes it from
+the weak-observation pass, so continuing weak measurements cannot restore it.
+Include retained lost tracks in that pass, using its stricter 0.5 IoU cost limit
+and the existing reactivation branch. Class isolation, elapsed-time expiry and
+strong new-track creation remain enforced by the adapter and preceding patch.
+Only measurement-backed tracks are returned; no predicted boxes are published.
+
+Upstream-Status: Inappropriate [embedded specific]
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+diff --git a/deploy/TensorRT/cpp/src/BYTETracker.cpp b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -123,7 +123,10 @@
+ 	
+ 	for (int i = 0; i < u_track.size(); i++)
+ 	{
+-		if (strack_pool[u_track[i]]->state == TrackState::Tracked)
++		// Retained identities may recover with measured weak boxes only under
++		// this pass's stricter IoU gate. Expiry is enforced before matching.
++		if (strack_pool[u_track[i]]->state == TrackState::Tracked ||
++			strack_pool[u_track[i]]->state == TrackState::Lost)
+ 		{
+ 			r_tracked_stracks.push_back(strack_pool[u_track[i]]);
+ 		}
