@@ -17,6 +17,7 @@
 #include <rclcpp/timer.hpp>
 
 #include "core/follower.h"
+#include "core/trail.h"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_attitude.hpp"
@@ -47,6 +48,7 @@ class FollowingNode final : public rclcpp::Node {
   using Select = raven_interfaces::srv::SelectTarget;
   using Enable = std_srvs::srv::SetBool;
   void Configure();
+  void ValidateConfiguration() const;
   void Connect();
   void ReceiveTracks(const vision_msgs::msg::Detection2DArray& message);
   void ReceiveInfo(const sensor_msgs::msg::CameraInfo& message);
@@ -67,6 +69,9 @@ class FollowingNode final : public rclcpp::Node {
   [[nodiscard]] Projection TargetPoint(
       const vision_msgs::msg::Detection2D& detection) const;
   void Tick();
+  void UpdateCommand(const Pose& pose);
+  void UpdateBraking(const Pose& pose);
+  void ResumeVelocity();
   void Hold(const std::string& reason);
   void PublishCommand();
   void TraceFrame(std::int64_t source_stamp_ns) const;
@@ -88,10 +93,14 @@ class FollowingNode final : public rclcpp::Node {
   double max_displacement_ = 0;
   bool enabled_ = false;
   bool streaming_ = false;
+  bool braking_ = false;
   std::optional<Vector> target_;
   Vector hold_position_{};
   Vector origin_{};
   Command command_;
+  MotionEstimator motion_;
+  TargetTrail trail_;
+  std::int64_t last_control_stamp_ns_ = 0;
   std::optional<sensor_msgs::msg::CameraInfo> info_;
   std::optional<px4_msgs::msg::VehicleStatus> status_;
   std::optional<px4_msgs::msg::VehicleLocalPosition> position_;

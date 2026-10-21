@@ -28,9 +28,10 @@
 
 namespace raven::following {
 namespace {
+constexpr double kStoppedSpeed = 0.3;
 constexpr auto kNanosPerMillisecond = 1000000.0;
 constexpr auto kPeriod = std::chrono::milliseconds(50);
-constexpr double kDt = 0.05;
+constexpr double kMaximumControlStep = 0.1;
 constexpr double kTelemetryTimeout = 0.5;
 constexpr double kStatusTimeout = 2.0;
 constexpr double kPoseToleranceUs = 100000;
@@ -125,6 +126,11 @@ void FollowingNode::Configure() {
   labels_topic_ = declare_parameter<std::string>(
       "labels_topic", "/raven/vehicle_1/perception/label_info", options);
   loss_timeout_seconds_ = number("target_loss_timeout", kDefaultLossTimeout);
+  config_.follow_path = declare_parameter<bool>("follow_path", false, options);
+  config_.align_with_motion =
+      declare_parameter<bool>("align_with_motion", false, options);
+  config_.motion_bearing_offset =
+      number("motion_bearing_offset", config_.motion_bearing_offset);
   config_.distance = number("follow_distance", config_.distance);
   config_.gain = number("position_gain", config_.gain);
   config_.max_speed = number("max_speed", config_.max_speed);
@@ -136,8 +142,14 @@ void FollowingNode::Configure() {
   timeout_seconds_ = number("target_timeout", kDefaultTargetTimeout);
   max_displacement_ = number("max_displacement", kDefaultMaxDisplacement);
   camera_.pitch = number("camera_pitch", camera_.pitch);
+  camera_.stabilized =
+      declare_parameter<bool>("camera_stabilized", false, options);
   camera_.offset = {number("camera_forward", 0), number("camera_right", 0),
                     number("camera_down", 0)};
+  ValidateConfiguration();
+}
+
+void FollowingNode::ValidateConfiguration() const {
   if (px4_namespace_.empty() || px4_namespace_.front() != '/' ||
       config_.distance <= 0 || config_.gain <= 0 || config_.max_speed <= 0 ||
       config_.max_acceleration <= 0 || config_.max_yaw_rate <= 0 ||
@@ -390,7 +402,7 @@ void FollowingNode::ReceiveTracks(
     return;
   }
   tracks_ = message;
-  if (!enabled_ || !FreshTracks()) {
+  if ((!enabled_ && state_ != "selected") || !FreshTracks()) {
     return;
   }
   if (message.header.frame_id != selected_frame_) {
@@ -416,6 +428,13 @@ void FollowingNode::ReceiveTracks(
   }
   target_ = projection.point;
   target_stamp_ns_ = rclcpp::Time(message.header.stamp).nanoseconds();
+  motion_.Observe(*target_,
+                  static_cast<double>(target_stamp_ns_) / kNanoseconds);
+  const auto motion = motion_.Estimate(
+      static_cast<double>(target_stamp_ns_) / kNanoseconds, config_.max_speed);
+  if (motion) {
+    trail_.Observe(*motion);
+  }
   last_rejection_.clear();
   last_target_ = Clock::now();
   ++observations_used_;
@@ -442,6 +461,8 @@ void FollowingNode::SelectTarget(const Select::Request& request,
     response.message = "Person or car track is not visible";
     return;
   }
+  motion_.Reset();
+  trail_.Reset();
   selected_id_ = request.track_id;
   selected_frame_ = tracks_.header.frame_id;
   selected_class_ = found->results.front().hypothesis.class_id;
@@ -500,9 +521,15 @@ void FollowingNode::EnableFollowing(const Enable::Request& request,
   }
   origin_ = LatestPose().position;
   hold_position_ = origin_;
-  command_ = {{0, 0, 0}, Heading(LatestPose().orientation)};
+  command_ = {
+      {0, 0, 0},
+      Heading(LatestPose().orientation),
+      std::atan2((*target_)[1] - origin_[1], (*target_)[0] - origin_[0])};
   last_target_ = Clock::now();
   target_stamp_ns_ = rclcpp::Time(tracks_.header.stamp).nanoseconds();
+  motion_.Observe(*target_,
+                  static_cast<double>(target_stamp_ns_) / kNanoseconds);
+  last_control_stamp_ns_ = now().nanoseconds();
   enabled_ = true;
   streaming_ = true;
   state_ = "following";
@@ -517,7 +544,10 @@ void FollowingNode::Hold(const std::string& reason) {
                       position_.value().z};
   }
   enabled_ = false;
+  braking_ = streaming_;
   target_.reset();
+  motion_.Reset();
+  trail_.Reset();
   command_.velocity = {0, 0, 0};
   state_ = streaming_ ? "holding" : "idle";
   reason_ = reason;
@@ -561,11 +591,65 @@ void FollowingNode::Tick() {
           max_displacement_) {
     Hold("Following displacement limit reached");
   }
-  if (enabled_ && state_ == "following" && target_) {
-    command_ =
-        Follow({pose, *target_, command_.velocity, command_.yaw, kDt}, config_);
-  }
+  UpdateCommand(pose);
+  UpdateBraking(pose);
   PublishCommand();
+}
+
+void FollowingNode::UpdateCommand(const Pose& pose) {
+  const auto stamp = now().nanoseconds();
+  const auto dt = std::clamp(
+      static_cast<double>(stamp - last_control_stamp_ns_) / kNanoseconds, 0.0,
+      kMaximumControlStep);
+  last_control_stamp_ns_ = stamp;
+  if (!enabled_ || state_ != "following" || !target_ || dt <= 0) {
+    return;
+  }
+  const auto motion = motion_.Estimate(
+      static_cast<double>(stamp) / kNanoseconds, config_.max_speed);
+  if (!motion) {
+    WaitForTarget();
+    return;
+  }
+  ResumeVelocity();
+  command_ = Follow(
+      {pose, motion->position, motion->velocity, command_.velocity,
+       command_.yaw, dt, command_.bearing,
+       config_.follow_path ? trail_.Reference(config_.distance) : std::nullopt},
+      config_);
+}
+
+void FollowingNode::ResumeVelocity() {
+  if (!braking_ || !position_) {
+    return;
+  }
+  const auto north = static_cast<double>(position_.value().vx);
+  const auto east = static_cast<double>(position_.value().vy);
+  const auto scale =
+      config_.max_speed / std::max(config_.max_speed, std::hypot(north, east));
+  // Resume from the measured motion after braking, rather than ramping from
+  // a zero setpoint while the aircraft is still travelling.
+  command_.velocity = {north * scale, east * scale, 0};
+  braking_ = false;
+}
+
+void FollowingNode::UpdateBraking(const Pose& pose) {
+  if (enabled_ && state_ == "following") {
+    braking_ = false;
+    return;
+  }
+  if (!braking_ || !position_) {
+    return;
+  }
+  if (std::hypot(static_cast<double>(position_.value().vx),
+                 static_cast<double>(position_.value().vy)) > kStoppedSpeed) {
+    return;
+  }
+  // Tick has validated telemetry. Lock the stopping position after velocity
+  // control has removed horizontal motion; do not return to the loss point.
+  hold_position_[0] = pose.position[0];
+  hold_position_[1] = pose.position[1];
+  braking_ = false;
 }
 
 void FollowingNode::WaitForTarget() {
@@ -576,6 +660,7 @@ void FollowingNode::WaitForTarget() {
   hold_position_[0] = pose.position[0];
   hold_position_[1] = pose.position[1];
   command_.velocity = {0, 0, 0};
+  braking_ = true;
   state_ = "waiting";
   reason_ = "Brief detection gap; holding for the same selected identity";
 }
@@ -590,16 +675,19 @@ void FollowingNode::PublishCommand() {
   px4_msgs::msg::TrajectorySetpoint setpoint;
   setpoint.timestamp = mode.timestamp;
   const auto moving = enabled_ && state_ == "following";
+  const auto velocity_control = moving || braking_;
+  const auto velocity = moving ? command_.velocity : Vector{};
   setpoint.position =
-      moving ? std::array<float, 3>{nan, nan,
-                                    static_cast<float>(hold_position_[2])}
-             : std::array<float, 3>{static_cast<float>(hold_position_[0]),
-                                    static_cast<float>(hold_position_[1]),
-                                    static_cast<float>(hold_position_[2])};
+      velocity_control
+          ? std::array<float, 3>{nan, nan,
+                                 static_cast<float>(hold_position_[2])}
+          : std::array<float, 3>{static_cast<float>(hold_position_[0]),
+                                 static_cast<float>(hold_position_[1]),
+                                 static_cast<float>(hold_position_[2])};
   setpoint.velocity =
-      moving
-          ? std::array<float, 3>{static_cast<float>(command_.velocity[0]),
-                                 static_cast<float>(command_.velocity[1]), nan}
+      velocity_control
+          ? std::array<float, 3>{static_cast<float>(velocity[0]),
+                                 static_cast<float>(velocity[1]), nan}
           : std::array<float, 3>{nan, nan, nan};
   setpoint.acceleration = {nan, nan, nan};
   setpoint.jerk = {nan, nan, nan};
@@ -641,6 +729,7 @@ void FollowingNode::PublishHealth() {
     health.values.push_back(metric);
   };
   add("state", state_);
+  add("braking", braking_ ? "true" : "false");
   add("selected_track", selected_id_);
   add("px4_namespace", px4_namespace_);
   add("setpoints_sent", std::to_string(setpoints_sent_));
@@ -659,6 +748,15 @@ void FollowingNode::PublishHealth() {
         target_.value()[0] - static_cast<double>(position_.value().x),
         target_.value()[1] - static_cast<double>(position_.value().y));
     add("target_range_m", std::to_string(range));
+  }
+  const auto motion =
+      motion_.Estimate(static_cast<double>(now().nanoseconds()) / kNanoseconds,
+                       config_.max_speed);
+  if (motion) {
+    add("target_velocity_north", std::to_string(motion->velocity[0]));
+    add("target_velocity_east", std::to_string(motion->velocity[1]));
+    add("target_speed_mps",
+        std::to_string(std::hypot(motion->velocity[0], motion->velocity[1])));
   }
   add("velocity_north", std::to_string(command_.velocity[0]));
   add("velocity_east", std::to_string(command_.velocity[1]));

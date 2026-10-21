@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <deque>
 #include <optional>
 
 namespace raven::following {
@@ -18,8 +19,10 @@ struct Camera {
   double fy = 0;
   double cx = 0;
   double cy = 0;
-  double pitch = 0;  // Fixed downward tilt from body forward, radians.
+  double pitch = 0;  // Downward tilt in the mount frame, radians.
   Vector offset{};   // Camera origin in body FRD, metres.
+  // Roll/pitch stabilization; yaw follows the aircraft.
+  bool stabilized = false;
 };
 
 struct Pixel {
@@ -42,19 +45,52 @@ struct Configuration {
   double max_yaw_rate = kDefaultYawRate;
   double ground_z = 0;
   double max_range = kDefaultRange;
+  bool follow_path = false;
+  bool align_with_motion = false;
+  double motion_bearing_offset =
+      0;  // Radians from target velocity toward its bearing.
+};
+
+struct Motion {
+  Vector position{};
+  Vector velocity{};
 };
 
 struct FollowInput {
   Pose pose;
   Vector target{};
+  Vector target_velocity{};
   Vector previous_velocity{};
   double previous_yaw = 0;
   double dt = 0;
+  double previous_bearing = 0;
+  std::optional<Motion> reference;
 };
 
 struct Command {
   Vector velocity{};
   double yaw = 0;
+  double bearing = 0;
+};
+
+// Fits local-NED observations at capture time. Prediction is bounded to the
+// freshness budget; it does not bridge a lost identity or a stale source.
+class MotionEstimator {
+ public:
+  void Reset();
+  void Observe(const Vector& point, double stamp);
+  [[nodiscard]] std::optional<Motion> Estimate(double stamp,
+                                               double max_speed) const;
+
+ private:
+  struct Observation {
+    Vector point{};
+    double stamp = 0;
+  };
+
+  [[nodiscard]] Motion Fit() const;
+  std::deque<Observation> observations_;
+  std::optional<Vector> retained_velocity_;
 };
 
 [[nodiscard]] bool ValidPose(const Pose& pose);

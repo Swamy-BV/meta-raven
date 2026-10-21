@@ -15,7 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-add_executable(target-follower main.cpp core/follower.cpp adapters/ros/node.cpp)
+add_executable(target-follower main.cpp core/follower.cpp core/trail.cpp adapters/ros/node.cpp)
 target_include_directories(target-follower PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 ament_target_dependencies(
   target-follower
