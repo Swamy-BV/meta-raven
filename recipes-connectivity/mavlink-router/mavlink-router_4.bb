@@ -11,6 +11,8 @@ DEPENDS = "systemd"
 SRC_URI = "\
     gitsm://github.com/mavlink-router/mavlink-router.git;protocol=https;branch=master \
     file://0001-dedup-include-cstdint.patch \
+    file://0002-disable-nagle-for-tcp-clients.patch \
+    file://0003-retain-partial-uart-writes.patch \
     file://main.conf \
     file://mavlink-router.service \
     file://99-px4-mavlink.rules \

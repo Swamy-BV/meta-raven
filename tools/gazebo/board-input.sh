@@ -48,7 +48,7 @@ else
 fi
 # Apply the same ROS clock to the complete observation/control path. All
 # overrides live in /run and vanish on reboot. Physical operation uses wall time.
-for service in vision-engine target-tracker target-follower; do
+for service in vision-engine target-tracker guidance; do
   path=/run/systemd/system/$service.service.d/90-gazebo.conf
   if [ "$mode" = flight ]; then
     mkdir -p "${path%/*}"
@@ -63,7 +63,7 @@ CONF
   fi
 done
 systemctl daemon-reload
-systemctl stop target-follower
+systemctl stop guidance
 systemctl restart media-capture vision-engine target-tracker
 if [ "$mode" = flight ]; then
   systemctl start px4-simulation-agent.service

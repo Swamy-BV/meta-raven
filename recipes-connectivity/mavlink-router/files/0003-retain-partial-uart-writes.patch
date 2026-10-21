@@ -1,0 +1,96 @@
+From: Raven Developers <raven@localhost>
+Subject: [PATCH] uart: retain partial writes and retry with epoll
+
+RPMsg TTY endpoints can accept only part of a MAVLink frame. Discarding
+its tail corrupts the byte stream, especially with bursty HIL input.
+Use the existing bounded TX buffer and mainloop EPOLLOUT handling.
+When the buffer fills, discard a whole new frame instead of truncating
+one that has already been partly transmitted.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Developers <raven@localhost>
+
+--- a/src/endpoint.cpp
++++ b/src/endpoint.cpp
+@@ -998,35 +998,46 @@
+ int UartEndpoint::write_msg(const struct buffer *pbuf)
+ {
+     if (fd < 0) {
+-        log_error("UART %s: Trying to write invalid fd", _name.c_str());
+         return -EINVAL;
+     }
+ 
+-    /* TODO: send any pending data */
+-    if (tx_buf.len > 0) {
+-        ;
+-    }
+-
+-    ssize_t r = ::write(fd, pbuf->data, pbuf->len);
+-    if (r == -1 && errno == EAGAIN) {
+-        return -EAGAIN;
+-    }
+-
++    // Preserve a partially written frame before appending another frame.
++    int ret = flush_pending_msgs();
++    if (ret < 0 && ret != -EAGAIN) {
++        return ret;
++    }
++
++    if (pbuf->len > TX_BUF_MAX_SIZE - tx_buf.len) {
++        // Drop only a whole new frame; never corrupt an in-flight frame.
++        _incomplete_msgs++;
++        return tx_buf.len > 0 ? -EAGAIN : -ENOBUFS;
++    }
++
++    memcpy(tx_buf.data + tx_buf.len, pbuf->data, pbuf->len);
++    tx_buf.len += pbuf->len;
+     _stat.write.total++;
+-    _stat.write.bytes += pbuf->len;
+-
+-    /* Incomplete packet, we warn and discard the rest */
+-    if (r != (ssize_t)pbuf->len) {
+-        _incomplete_msgs++;
+-        log_debug("UART %s: Discarding packet, incomplete write %zd but len=%u",
+-                  _name.c_str(),
+-                  r,
+-                  pbuf->len);
+-    }
+-
+-    log_trace("UART [%d]%s: Wrote %zd bytes", fd, _name.c_str(), r);
+-
+-    return r;
++    return flush_pending_msgs();
++}
++
++int UartEndpoint::flush_pending_msgs()
++{
++    while (tx_buf.len > 0) {
++        ssize_t written = ::write(fd, tx_buf.data, tx_buf.len);
++        if (written < 0) {
++            if (errno == EINTR) {
++                continue;
++            }
++            return errno == EWOULDBLOCK ? -EAGAIN : -errno;
++        }
++        if (written == 0) {
++            return -EAGAIN;
++        }
++
++        _stat.write.bytes += written;
++        tx_buf.len -= written;
++        memmove(tx_buf.data, tx_buf.data + written, tx_buf.len);
++    }
++    return 0;
+ }
+ 
+ int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
+--- a/src/endpoint.h
++++ b/src/endpoint.h
+@@ -297,6 +297,6 @@
+     ~UartEndpoint() override = default;
+ 
+     int write_msg(const struct buffer *pbuf) override;
+-    int flush_pending_msgs() override { return -ENOSYS; }
++    int flush_pending_msgs() override;
+ 
+     bool setup(UartEndpointConfig config); ///< open UART device and apply config

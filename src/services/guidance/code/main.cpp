@@ -12,13 +12,13 @@ int main(int argc, char** argv) {
   try {
     rclcpp::init(argc, argv);
     {
-      const auto node = std::make_shared<raven::following::FollowingNode>();
+      const auto node = std::make_shared<raven::guidance::GuidanceNode>();
       rclcpp::spin(node);
     }
     rclcpp::shutdown();
     return 0;
   } catch (const std::exception& error) {
-    std::cerr << "target-follower: " << error.what() << '\n';
+    std::cerr << "guidance: " << error.what() << '\n';
     if (rclcpp::ok()) {
       rclcpp::shutdown();
     }

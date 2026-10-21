@@ -1,5 +1,5 @@
-SUMMARY = "Explicit selected-target visual following"
-DESCRIPTION = "ROS target selection and bounded PX4 offboard requests with target-loss hold"
+SUMMARY = "Modular PX4 motion guidance"
+DESCRIPTION = "ROS GoTo and selected-target following with bounded motion, explicit command ownership and loss hold"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "robotics"
@@ -9,37 +9,43 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c5
 DEPENDS = "\
     ament-cmake-native \
     diagnostic-msgs \
+    geometry-msgs \
     platform-interfaces \
     px4-msgs \
     rcl-interfaces \
     rclcpp \
+    rclcpp-action \
+    ruckig \
     sensor-msgs \
     std-srvs \
     vision-msgs \
 "
-SRC_URI = "file://target-follower.service file://target-follower.yaml"
-ROS_BPN = "target_follower"
+SRC_URI = "file://guidance.service file://guidance.yaml"
+ROS_BPN = "guidance"
 inherit ros_distro_jazzy ros_component ros_ament_cmake systemd
 
-SYSTEMD_SERVICE:${PN} = "target-follower.service"
+SYSTEMD_SERVICE:${PN} = "guidance.service"
 # Following is activated explicitly; installation must not start flight behavior.
 SYSTEMD_AUTO_ENABLE:${PN} = "disable"
-CONFFILES:${PN} = "${sysconfdir}/target-follower.yaml"
+CONFFILES:${PN} = "${sysconfdir}/guidance.yaml"
 RDEPENDS:${PN} = "\
     diagnostic-msgs \
+    geometry-msgs \
     platform-interfaces \
     px4-msgs \
     raven-ros-config \
     rclcpp \
+    rclcpp-action \
     rmw-cyclonedds-cpp \
+    ruckig \
     sensor-msgs \
     std-srvs \
     vision-msgs \
 "
 
 do_install:append() {
-    install -D -m 0644 ${UNPACKDIR}/target-follower.yaml ${D}${sysconfdir}/target-follower.yaml
-    install -D -m 0644 ${UNPACKDIR}/target-follower.service ${D}${systemd_system_unitdir}/target-follower.service
-    sed -i 's|@ROS_PREFIX@|${ros_prefix}|g' ${D}${systemd_system_unitdir}/target-follower.service
+    install -D -m 0644 ${UNPACKDIR}/guidance.yaml ${D}${sysconfdir}/guidance.yaml
+    install -D -m 0644 ${UNPACKDIR}/guidance.service ${D}${systemd_system_unitdir}/guidance.service
+    sed -i 's|@ROS_PREFIX@|${ros_prefix}|g' ${D}${systemd_system_unitdir}/guidance.service
 }
 inherit raven_source raven_quality

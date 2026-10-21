@@ -1,11 +1,19 @@
-/raven/vehicle_1/autonomy/target_follower:
+/raven/vehicle_1/autonomy/guidance:
   ros__parameters:
+    allow_unmapped_motion: false
+    local_frame: px4_local_enu
+    max_jerk: 1.0
+    minimum_height: 2.0
+    maximum_height: 12.0
     # Separate from the real M7 /fmu namespace. Service starts idle and never arms.
     px4_namespace: /simulation
     tracks_topic: /raven/vehicle_1/perception/tracks
     camera_info_topic: /raven/vehicle_1/cameras/front/camera_info
     labels_topic: /raven/vehicle_1/perception/label_info
     metadata_topic: /raven/vehicle_1/perception/vision_info
+    # Position measurement deviation (m); acceleration spectral density (m^2/s^3).
+    target_position_stddev: 0.35
+    target_acceleration_noise: 0.5
     follow_distance: 8.0
     position_gain: 0.4
     max_speed: 0.6

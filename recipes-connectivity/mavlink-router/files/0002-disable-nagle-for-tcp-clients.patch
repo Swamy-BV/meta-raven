@@ -1,0 +1,26 @@
+From: Raven Developers <raven@localhost>
+Subject: [PATCH] endpoint: disable Nagle on outgoing TCP connections
+
+Accepted TCP sockets already use TCP_NODELAY. Apply the same policy to
+client sockets so small HIL actuator packets do not wait for delayed ACKs.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Developers <raven@localhost>
+---
+--- a/src/endpoint.cpp
++++ b/src/endpoint.cpp
+@@ -1624,6 +1624,14 @@
+         return false;
+     }
+ 
++    // Match accepted sockets: flight-control packets must not wait for
++    // Nagle's algorithm on outgoing simulator or telemetry connections.
++    int tcp_nodelay_state = 1;
++    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&tcp_nodelay_state, sizeof(int)) < 0) {
++        log_error("Error setting TCP_NODELAY on [%d]%s", fd, _name.c_str());
++        goto fail;
++    }
++
+     // common setup
+     if (connect(fd, sock, addrlen) < 0) {
+         log_error("%d Error connecting to %s:%lu (%m)", fd, ip.c_str(), port);

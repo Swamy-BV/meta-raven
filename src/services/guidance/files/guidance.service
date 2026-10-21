@@ -1,5 +1,5 @@
 [Unit]
-Description=Selected-target visual following (explicit activation)
+Description=Motion guidance (explicit activation)
 After=target-tracker.service
 StartLimitIntervalSec=120
 StartLimitBurst=3
@@ -7,12 +7,12 @@ StartLimitBurst=3
 [Service]
 Type=simple
 DynamicUser=yes
-LogsDirectory=target-follower
-Environment=ROS_LOG_DIR=/var/log/target-follower
+LogsDirectory=guidance
+Environment=ROS_LOG_DIR=/var/log/guidance
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
 EnvironmentFile=/etc/ros/ros2.env
-ExecStart=@ROS_PREFIX@/lib/target_follower/target-follower --ros-args --params-file /etc/target-follower.yaml
+ExecStart=@ROS_PREFIX@/lib/guidance/guidance --ros-args --params-file /etc/guidance.yaml
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10

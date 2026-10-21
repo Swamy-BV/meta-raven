@@ -1,0 +1,15 @@
+# Position in local_frame (ENU), with yaw about its upward axis in radians.
+# Only the configured frame is accepted; no implicit transform or global origin.
+geometry_msgs/PointStamped target
+float64 yaw
+float64 max_speed
+float64 position_tolerance 0.3
+float64 timeout 60.0
+# No obstacle planner exists yet. Both this flag and node configuration must opt in.
+bool allow_unmapped_motion false
+---
+bool success
+string message
+---
+float64 distance_remaining
+string state

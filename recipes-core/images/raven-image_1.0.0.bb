@@ -40,7 +40,7 @@ IMAGE_INSTALL:append = " \
     kernel-module-imx477 \
     vision-engine \
     target-tracker \
-    target-follower \
+    guidance \
 "
 
 # Publish a block map with the compressed factory WIC for bmaptool and UUU.

@@ -1,23 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-#include "follower.h"
+#include "follow.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <optional>
 
-namespace raven::following {
+namespace raven::guidance {
 namespace {
 constexpr double kMinimumRayDown = 0.05;
 constexpr double kMinimumRange = 0.2;
 constexpr double kQuaternionTolerance = 0.01;
-constexpr double kMotionWindow = 0.6;
-constexpr double kMinimumMotionSpan = 0.4;
-constexpr double kMaximumPrediction = 0.35;
-constexpr double kMaximumReacquisitionGap = 1.5;
-constexpr double kMinimumVariance = 1e-6;
-constexpr auto kMaximumObservations = 64U;
-constexpr double kMinimumHeadingSpeed = 2.0;
+constexpr double kFormationResponseSeconds = 0.7;
+constexpr double kHeadingResponseSeconds = 0.4;
 
 Vector LimitVelocity(const Vector& velocity, const double maximum) {
   const auto speed = std::hypot(velocity[0], velocity[1]);
@@ -30,16 +25,37 @@ double FormationBearing(const FollowInput& input, const Configuration& config) {
   const auto east = input.target[1] - input.pose.position[1];
   const auto speed =
       std::hypot(input.target_velocity[0], input.target_velocity[1]);
-  if (!config.align_with_motion || speed < kMinimumHeadingSpeed) {
+  if (!config.align_with_motion) {
     return std::atan2(east, north);
+  }
+  if (speed < config.minimum_heading_speed) {
+    // Keep the established formation when motion is too small to give a
+    // reliable travel direction, including stops and the initial acquisition.
+    return input.previous_bearing;
   }
   const auto desired =
       std::atan2(input.target_velocity[1], input.target_velocity[0]) +
       config.motion_bearing_offset;
   const auto error = std::atan2(std::sin(desired - input.previous_bearing),
                                 std::cos(desired - input.previous_bearing));
-  const auto step = config.max_yaw_rate * input.dt;
-  return input.previous_bearing + std::clamp(error, -step, step);
+  // A proportional heading response avoids bang-bang lateral feed-forward
+  // from small velocity-estimate direction changes.
+  const auto rate = std::clamp(error / kFormationResponseSeconds,
+                               -config.max_yaw_rate, config.max_yaw_rate);
+  return input.previous_bearing + rate * input.dt;
+}
+
+Motion FormationReference(const FollowInput& input, const Configuration& config,
+                          const double bearing) {
+  const auto rate = config.align_with_motion && input.dt > 0
+                        ? (bearing - input.previous_bearing) / input.dt
+                        : 0;
+  const auto north = config.distance * std::cos(bearing);
+  const auto east = config.distance * std::sin(bearing);
+  // Differentiate target - distance * heading, including the rotating offset.
+  return {{input.target[0] - north, input.target[1] - east, config.ground_z},
+          {input.target_velocity[0] + east * rate,
+           input.target_velocity[1] - north * rate, 0}};
 }
 
 Vector GovernSeparation(const Vector& desired, const FollowInput& input,
@@ -134,109 +150,12 @@ double Heading(const Quaternion& orientation) {
                orientation[3] * orientation[3]));
 }
 
-void MotionEstimator::Reset() {
-  observations_.clear();
-  retained_velocity_.reset();
-}
-
-void MotionEstimator::Observe(const Vector& point, const double stamp) {
-  if (!std::isfinite(stamp) ||
-      !std::all_of(point.begin(), point.end(),
-                   [](const double value) { return std::isfinite(value); })) {
-    return;
-  }
-  if (!observations_.empty()) {
-    const auto dt = stamp - observations_.back().stamp;
-    if (dt <= 0) {
-      return;
-    }
-    if (dt > kMaximumReacquisitionGap) {
-      Reset();
-    } else if (dt > kMaximumPrediction) {
-      // Preserve velocity through a short occlusion, but fit only the new
-      // segment. Estimates still require a fresh acquisition timestamp.
-      observations_.clear();
-    }
-  }
-  observations_.push_back({point, stamp});
-  while (observations_.size() > kMaximumObservations ||
-         stamp - observations_.front().stamp > kMotionWindow) {
-    observations_.pop_front();
-  }
-  if (observations_.back().stamp - observations_.front().stamp >=
-      kMinimumMotionSpan) {
-    retained_velocity_ = Fit().velocity;
-  }
-}
-
-std::optional<Motion> MotionEstimator::Estimate(const double stamp,
-                                                const double max_speed) const {
-  if (observations_.empty() || !std::isfinite(stamp) ||
-      !std::isfinite(max_speed) || max_speed <= 0) {
-    return std::nullopt;
-  }
-  const auto& latest = observations_.back();
-  const auto age = stamp - latest.stamp;
-  if (age < 0 || age > kMaximumPrediction) {
-    return std::nullopt;
-  }
-  Motion motion{latest.point, retained_velocity_.value_or(Vector{})};
-  if (latest.stamp - observations_.front().stamp >= kMinimumMotionSpan) {
-    motion = Fit();
-  }
-  motion.velocity = LimitVelocity(motion.velocity, max_speed);
-  for (std::size_t axis = 0; axis < motion.position.size(); ++axis) {
-    motion.position[axis] += motion.velocity[axis] * age;
-  }
-  return motion;
-}
-
-Motion MotionEstimator::Fit() const {
-  const auto& latest = observations_.back();
-  Motion motion{latest.point, {0, 0, 0}};
-  double mean_time = 0;
-  Vector mean_point{};
-  for (const auto& observation : observations_) {
-    mean_time += observation.stamp - latest.stamp;
-    for (std::size_t axis = 0; axis < mean_point.size(); ++axis) {
-      mean_point[axis] += observation.point[axis];
-    }
-  }
-  const auto count = static_cast<double>(observations_.size());
-  mean_time /= count;
-  for (auto& value : mean_point) {
-    value /= count;
-  }
-  double variance = 0;
-  Vector covariance{};
-  for (const auto& observation : observations_) {
-    const auto dt = observation.stamp - latest.stamp - mean_time;
-    variance += dt * dt;
-    for (std::size_t axis = 0; axis < covariance.size(); ++axis) {
-      covariance[axis] += dt * (observation.point[axis] - mean_point[axis]);
-    }
-  }
-  if (variance < kMinimumVariance) {
-    return motion;
-  }
-  for (std::size_t axis = 0; axis < motion.velocity.size(); ++axis) {
-    motion.velocity[axis] = covariance[axis] / variance;
-  }
-  for (std::size_t axis = 0; axis < motion.position.size(); ++axis) {
-    motion.position[axis] =
-        mean_point[axis] - motion.velocity[axis] * mean_time;
-  }
-  return motion;
-}
-
 Command Follow(const FollowInput& input, const Configuration& config) {
   const auto north = input.target[0] - input.pose.position[0];
   const auto east = input.target[1] - input.pose.position[1];
   const auto bearing = FormationBearing(input, config);
-  auto reference = input.reference.value_or(Motion{
-      {input.target[0] - config.distance * std::cos(bearing),
-       input.target[1] - config.distance * std::sin(bearing), config.ground_z},
-      input.target_velocity});
+  auto reference =
+      input.reference.value_or(FormationReference(input, config, bearing));
   if (input.reference) {
     // A delayed path reference must not carry cruising speed into the leader's
     // current braking manoeuvre.
@@ -254,18 +173,16 @@ Command Follow(const FollowInput& input, const Configuration& config) {
   if (config.follow_path) {
     desired = GovernSeparation(desired, input, config);
   }
-  const auto delta_north = desired[0] - input.previous_velocity[0];
-  const auto delta_east = desired[1] - input.previous_velocity[1];
-  const auto delta = std::hypot(delta_north, delta_east);
-  const auto step = config.max_acceleration * input.dt;
-  const auto fraction = delta > step ? step / delta : 1.0;
   const auto yaw = std::atan2(east, north);
   const auto error = std::atan2(std::sin(yaw - input.previous_yaw),
                                 std::cos(yaw - input.previous_yaw));
   const auto yaw_step = config.max_yaw_rate * input.dt;
-  return {{input.previous_velocity[0] + fraction * delta_north,
-           input.previous_velocity[1] + fraction * delta_east, 0},
-          input.previous_yaw + std::clamp(error, -yaw_step, yaw_step),
-          bearing};
+  // Vision arrives slower than the control tick. Filter its bearing before
+  // differentiating it; direct heading steps amplify delayed pixel noise into
+  // alternating yaw-rate feed-forward and an unstable image-centering loop.
+  const auto response = -std::expm1(-input.dt / kHeadingResponseSeconds);
+  const auto step = std::clamp(error * response, -yaw_step, yaw_step);
+  return {desired, input.previous_yaw + step, bearing,
+          input.dt > 0 ? step / input.dt : 0};
 }
-}  // namespace raven::following
+}  // namespace raven::guidance

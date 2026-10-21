@@ -9,7 +9,7 @@ flowchart LR
         video[MediaMTX]
         vision[vision-engine]
         tracker[target-tracker]
-        follower[target-follower]
+        follower[guidance]
         simagent[Simulation DDS agent - temporary]
         agent[Micro XRCE-DDS Agent]
         router[mavlink-router]
@@ -21,9 +21,10 @@ flowchart LR
         tracker -->|Selected track observations| follower
         follower <-->|/simulation PX4 topics| simagent
     end
-    ros -->|Select target / enable following| follower
-    simagent <-->|uXRCE-DDS UDP| simulation[PX4 SITL + Gazebo - WSL]
-    simulation -->|H.264 RTP| media
+    ros -->|GoTo action / select target / enable following| follower
+    simagent <-->|uXRCE-DDS UDP| simulation[PX4 SITL - WSL]
+    simulation <-->|Sensors / actuators| world[AirSim / Gazebo with host bridge]
+    world -->|H.264 RTP| media
     video -->|WebRTC| browser[Browser preview]
     media <-->|Image / CameraInfo / services / actions| ros[ROS applications]
     vision -->|ROS vision / metadata / health| ros

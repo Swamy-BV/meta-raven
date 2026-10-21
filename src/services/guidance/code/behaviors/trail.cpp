@@ -6,9 +6,7 @@
 #include <cstddef>
 #include <optional>
 
-#include "core/follower.h"
-
-namespace raven::following {
+namespace raven::guidance {
 namespace {
 constexpr double kMinimumStep = 0.5;
 constexpr double kMaximumStep = 10;
@@ -42,8 +40,10 @@ void TargetTrail::Observe(const Motion& motion) {
   }
 }
 
-std::optional<Motion> TargetTrail::Reference(const double distance) const {
-  if (!std::isfinite(distance) || distance <= 0) {
+std::optional<Motion> TargetTrail::Reference(const double distance,
+                                             const double speed) const {
+  if (!std::isfinite(distance) || distance <= 0 || !std::isfinite(speed) ||
+      speed < 0) {
     return std::nullopt;
   }
   auto remaining = distance;
@@ -61,12 +61,16 @@ std::optional<Motion> TargetTrail::Reference(const double distance) const {
       reference.position[axis] =
           ahead.position[axis] +
           fraction * (behind.position[axis] - ahead.position[axis]);
+    }
+    // The delayed reference moves along the trail tangent at the target's
+    // current speed. Historical velocity causes lag and catch-up surges when
+    // the target accelerates, brakes or turns.
+    for (std::size_t axis = 0; axis < 2; ++axis) {
       reference.velocity[axis] =
-          ahead.velocity[axis] +
-          fraction * (behind.velocity[axis] - ahead.velocity[axis]);
+          (ahead.position[axis] - behind.position[axis]) / length * speed;
     }
     return reference;
   }
   return std::nullopt;
 }
-}  // namespace raven::following
+}  // namespace raven::guidance
