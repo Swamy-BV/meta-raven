@@ -18,6 +18,7 @@
 #include "behaviors/follow.h"
 #include "core/types.h"
 #include "estimation/motion.h"
+#include "estimation/pose.h"
 #include "node.h"
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "util.h"
@@ -70,6 +71,7 @@ void GuidanceNode::PublishHealth() {
   add("observations_used", std::to_string(observations_used_));
   add("rejected_observations", std::to_string(rejected_observations_));
   add("last_rejection", last_rejection_);
+  add("pose_alignment_failures", std::to_string(pose_alignment_failures_));
   add("source_stamp_ns", std::to_string(target_stamp_ns_));
   if (target_stamp_ns_ > 0) {
     add("source_age_ms",
@@ -94,10 +96,52 @@ void GuidanceNode::PublishHealth() {
   }
   add("velocity_north", std::to_string(command_.velocity[0]));
   add("velocity_east", std::to_string(command_.velocity[1]));
+  add("yaw_reference_rad", std::to_string(command_.yaw));
+  add("yaw_rate_reference_rad_s", std::to_string(command_.yaw_rate));
   add("projection",
       "box-footpoint to configured level ground; rectified pixels");
   report.status.push_back(health);
   health_->publish(report);
+}
+
+void GuidanceNode::PublishObservationHealth(
+    const std::string& rejection) const {
+  diagnostic_msgs::msg::DiagnosticArray report;
+  // Each report identifies the image measurement, not inference completion.
+  report.header = tracks_.header;
+  diagnostic_msgs::msg::DiagnosticStatus health;
+  health.name = "autonomy/guidance/observation";
+  health.level = rejection.empty()
+                     ? diagnostic_msgs::msg::DiagnosticStatus::OK
+                     : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+  health.message =
+      rejection.empty() ? "Target observation accepted" : rejection;
+  const auto add = [&health](const std::string& key, const std::string& value) {
+    diagnostic_msgs::msg::KeyValue metric;
+    metric.key = key;
+    metric.value = value;
+    health.values.push_back(metric);
+  };
+  add("selected_track", selected_id_);
+  add("pose_alignment", "linear_position_shortest_arc_slerp_attitude");
+  add("pose_aligned", alignment_ ? "true" : "false");
+  const auto stamp = rclcpp::Time(tracks_.header.stamp).nanoseconds();
+  add("source_age_ms",
+      std::to_string(static_cast<double>(now().nanoseconds() - stamp) /
+                     kNanosPerMillisecond));
+  if (alignment_) {
+    add("position_bracket_ms", std::to_string(alignment_->position_span_ms));
+    add("attitude_bracket_ms", std::to_string(alignment_->attitude_span_ms));
+  }
+  const auto& innovation = motion_.LastInnovation();
+  if (innovation &&
+      innovation->stamp == static_cast<double>(stamp) / kNanoseconds) {
+    add("innovation_north_m", std::to_string(innovation->residual[0]));
+    add("innovation_east_m", std::to_string(innovation->residual[1]));
+    add("innovation_test_ratio", std::to_string(innovation->test_ratio));
+  }
+  report.status.push_back(health);
+  observation_health_->publish(report);
 }
 
 }  // namespace raven::guidance

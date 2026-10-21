@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/time.hpp"
@@ -14,6 +15,7 @@
 #include "behaviors/trail.h"
 #include "core/types.h"
 #include "estimation/motion.h"
+#include "estimation/pose.h"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "node.h"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -32,6 +34,8 @@ void GuidanceNode::ConnectTargetOutputs() {
       "~/target_observation", qos);
   estimate_output_ = create_publisher<geometry_msgs::msg::PointStamped>(
       "~/target_position", qos);
+  observation_health_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
+      "~/observation_health", qos);
 }
 
 void GuidanceNode::PublishPoint(
@@ -123,7 +127,8 @@ void GuidanceNode::ReceiveMetadata(
 }
 
 GuidanceNode::Projection GuidanceNode::TargetPoint(
-    const vision_msgs::msg::Detection2D& detection) const {
+    const vision_msgs::msg::Detection2D& detection) {
+  alignment_.reset();
   if (!info_ || info_->header.frame_id != tracks_.header.frame_id) {
     return {std::nullopt, "Camera calibration/frame unavailable"};
   }
@@ -141,14 +146,13 @@ GuidanceNode::Projection GuidanceNode::TargetPoint(
   }
   const auto timestamp = static_cast<std::uint64_t>(
       rclcpp::Time(tracks_.header.stamp).nanoseconds() / kNanosPerMicro);
-  const auto position = Nearest(positions_, timestamp);
-  const auto attitude = Nearest(attitudes_, timestamp);
-  if (!position || !attitude) {
+  alignment_ = AlignPose(positions_, attitudes_, timestamp);
+  if (!alignment_) {
+    ++pose_alignment_failures_;
     return {std::nullopt,
-            "No vehicle pose within 100 ms of the image timestamp"};
+            "Image timestamp lacks bracketing vehicle pose within 100 ms"};
   }
-  const auto point =
-      ProjectGround(foot, camera_, {*position, *attitude}, config_);
+  const auto point = ProjectGround(foot, camera_, alignment_->pose, config_);
   return {point,
           point ? "" : "Invalid pose, ground intersection or target range"};
 }
@@ -185,6 +189,7 @@ void GuidanceNode::ReceiveTracks(
   if (!projection.point) {
     ++rejected_observations_;
     last_rejection_ = projection.reason;
+    PublishObservationHealth(last_rejection_);
     return;
   }
   PublishPoint(*projection.point, observation_output_);
@@ -193,6 +198,7 @@ void GuidanceNode::ReceiveTracks(
                        static_cast<double>(stamp) / kNanoseconds)) {
     ++rejected_observations_;
     last_rejection_ = "Target position rejected by motion filter";
+    PublishObservationHealth(last_rejection_);
     return;
   }
   target_ = projection.point;
@@ -206,6 +212,7 @@ void GuidanceNode::ReceiveTracks(
   last_rejection_.clear();
   last_target_ = Clock::now();
   ++observations_used_;
+  PublishObservationHealth("");
 }
 
 }  // namespace raven::guidance

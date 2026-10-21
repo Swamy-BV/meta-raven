@@ -3,12 +3,10 @@
 
 #include <chrono>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <optional>
 #include <set>
 #include <string>
-#include <utility>
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include <rclcpp/node.hpp>
@@ -25,6 +23,7 @@
 #include "behaviors/trail.h"
 #include "core/types.h"
 #include "estimation/motion.h"
+#include "estimation/pose.h"
 #include "execution/controller.h"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "planning/trajectory.h"
@@ -102,7 +101,7 @@ class GuidanceNode final : public rclcpp::Node {
   [[nodiscard]] bool FreshTarget() const;
   [[nodiscard]] Pose LatestPose() const;
   [[nodiscard]] Projection TargetPoint(
-      const vision_msgs::msg::Detection2D& detection) const;
+      const vision_msgs::msg::Detection2D& detection);
   void Tick();
   void UpdateCommand(const Pose& pose);
   void UpdateFollowingState();
@@ -115,6 +114,7 @@ class GuidanceNode final : public rclcpp::Node {
       std::uint64_t timestamp) const;
   void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth();
+  void PublishObservationHealth(const std::string& rejection) const;
 
   Configuration config_;
   MotionExecutor execution_;
@@ -161,8 +161,10 @@ class GuidanceNode final : public rclcpp::Node {
   std::optional<px4_msgs::msg::VehicleStatus> status_;
   std::optional<px4_msgs::msg::VehicleLocalPosition> position_;
   vision_msgs::msg::Detection2DArray tracks_;
-  std::deque<std::pair<std::uint64_t, Vector>> positions_;
-  std::deque<std::pair<std::uint64_t, Quaternion>> attitudes_;
+  PositionSamples positions_;
+  AttitudeSamples attitudes_;
+  std::optional<AlignedPose> alignment_;
+  std::uint64_t pose_alignment_failures_ = 0;
   Clock::time_point last_position_, last_attitude_, last_status_, last_target_;
   std::uint64_t setpoints_sent_ = 0;
   std::uint64_t observations_used_ = 0;
@@ -180,6 +182,8 @@ class GuidanceNode final : public rclcpp::Node {
   rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr mode_;
   rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpoint_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr health_;
+  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
+      observation_health_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr
       observation_output_,
       estimate_output_;

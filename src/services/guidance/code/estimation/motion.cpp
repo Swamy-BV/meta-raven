@@ -35,6 +35,7 @@ MotionEstimator::MotionEstimator(const double position_stddev,
 
 void MotionEstimator::Reset() {
   motion_.reset();
+  innovation_.reset();
   covariance_ = {};
   stamp_ = 0;
   first_stamp_ = 0;
@@ -51,6 +52,7 @@ MotionEstimator::Covariance MotionEstimator::PredictCovariance(
 }
 
 bool MotionEstimator::Observe(const Vector& point, const double stamp) {
+  innovation_.reset();
   if (!std::isfinite(stamp) || !Finite(point) || (motion_ && stamp <= stamp_)) {
     return false;
   }
@@ -72,11 +74,17 @@ bool MotionEstimator::Observe(const Vector& point, const double stamp) {
   const auto north = point[0] - prediction.position[0];
   const auto east = point[1] - prediction.position[1];
   const auto variance = covariance.position + measurement_variance_;
-  if ((north * north + east * east) / variance > kInnovationGate) {
+  const auto ratio = (north * north + east * east) / variance / kInnovationGate;
+  innovation_ = MotionInnovation{{north, east, 0}, stamp, ratio, ratio <= 1};
+  if (!innovation_->accepted) {
     return false;
   }
   Correct(point, prediction, covariance, stamp);
   return true;
+}
+
+const std::optional<MotionInnovation>& MotionEstimator::LastInnovation() const {
+  return innovation_;
 }
 
 void MotionEstimator::Correct(const Vector& point, const Motion& prediction,

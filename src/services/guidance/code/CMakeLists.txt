@@ -27,6 +27,7 @@ add_executable(
   planning/trajectory.cpp
   validation/motion.cpp
   estimation/motion.cpp
+  estimation/pose.cpp
   execution/controller.cpp
   adapters/ros/node.cpp
   adapters/ros/go_to.cpp
