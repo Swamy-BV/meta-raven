@@ -14,5 +14,6 @@
   { "include": [ "@[<\"]gobject/.*[>\"]", "private", "<glib-object.h>", "public" ] },
   { "include": [ "@[<\"]gio/.*[>\"]", "private", "<gio/gio.h>", "public" ] },
   { "include": [ "@[<\"]gst/gst[^/]*[.]h[>\"]", "private", "<gst/gst.h>", "public" ] },
-  { "include": [ "@[<\"]gst/video/.*[>\"]", "private", "<gst/video/video.h>", "public" ] }
+  { "include": [ "@[<\"]gst/video/.*[>\"]", "private", "<gst/video/video.h>", "public" ] },
+  { "include": [ "@[<\"]Eigen/src/Core/.*[>\"]", "private", "<Eigen/Core>", "public" ] }
 ]

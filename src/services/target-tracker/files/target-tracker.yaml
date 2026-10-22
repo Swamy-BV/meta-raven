@@ -2,6 +2,10 @@
   ros__parameters:
     detections_topic: /raven/vehicle_1/perception/detections
     metadata_topic: /raven/vehicle_1/perception/vision_info
+    # Empty keeps the established IoU baseline; opt in only to a qualified model.
+    vehicle_reid_model: ""
+    image_topic: /raven/vehicle_1/cameras/front/image_raw
+    vehicle_classes: ["2", "5", "7"]
     # Retain unseen identities only while fresh detection frames continue.
     lost_seconds: 1.5
     # Reject stale measurements and clear tracking state on input silence.

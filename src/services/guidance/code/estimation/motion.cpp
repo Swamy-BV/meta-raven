@@ -12,7 +12,6 @@
 namespace raven::guidance {
 namespace {
 constexpr double kMaximumPrediction = 0.35;
-constexpr double kMaximumReacquisitionGap = 1.5;
 constexpr double kMinimumMotionSpan = 0.4;
 constexpr double kInnovationGate = 9.210340371976184;
 
@@ -23,13 +22,16 @@ bool Finite(const Vector& point) {
 }  // namespace
 
 MotionEstimator::MotionEstimator(const double position_stddev,
-                                 const double acceleration_noise)
+                                 const double acceleration_noise,
+                                 const double retention_seconds)
     : measurement_variance_(position_stddev * position_stddev),
-      acceleration_noise_(acceleration_noise) {
+      acceleration_noise_(acceleration_noise),
+      retention_seconds_(retention_seconds) {
   if (!std::isfinite(position_stddev) || position_stddev <= 0 ||
       !std::isfinite(measurement_variance_) || measurement_variance_ <= 0 ||
-      !std::isfinite(acceleration_noise) || acceleration_noise <= 0) {
-    throw std::invalid_argument("Invalid target motion noise configuration");
+      !std::isfinite(acceleration_noise) || acceleration_noise <= 0 ||
+      !std::isfinite(retention_seconds) || retention_seconds <= 0) {
+    throw std::invalid_argument("Invalid target motion configuration");
   }
 }
 
@@ -56,7 +58,7 @@ bool MotionEstimator::Observe(const Vector& point, const double stamp) {
   if (!std::isfinite(stamp) || !Finite(point) || (motion_ && stamp <= stamp_)) {
     return false;
   }
-  if (motion_ && stamp - stamp_ > kMaximumReacquisitionGap) {
+  if (motion_ && stamp - stamp_ > retention_seconds_) {
     Reset();
   }
   if (!motion_) {

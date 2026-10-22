@@ -1,0 +1,67 @@
+{
+  "model": "PaddleDetection PP-LCNet vehicle ReID",
+  "version": "1.0.0",
+  "status": "experimental; demonstrated canopy and straight-road six-car bridge recovery; broader identity and quantization qualification pending",
+  "source_url": "https://paddledet.bj.bcebos.com/models/mot/deepsort/deepsort_pplcnet_vehicle.tar",
+  "source_sha256": "2362b2b5ed5a949a5e0164c1e189bc82d55388bae9c430c08458ccc09aec6082",
+  "reference": "https://github.com/PaddlePaddle/PaddleDetection/blob/release/2.9/configs/mot/mtmct/README_cn.md",
+  "training_dataset": "VERI-Wild",
+  "license": "Apache-2.0",
+  "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "input": {
+    "shape": [
+      1,
+      192,
+      64,
+      3
+    ],
+    "type": "int8",
+    "order": "RGB",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "normalization": "(RGB/255 - mean)/std; then tensor scale/zero_point"
+  },
+  "output": {
+    "shape": [
+      1,
+      512
+    ],
+    "type": "int8",
+    "postprocessing": "dequantize and L2 normalize; cosine distance"
+  },
+  "conversion": {
+    "paddlepaddle": "2.6.2",
+    "paddle2onnx": "1.2.11",
+    "onnx": "1.17.0",
+    "opset": 13,
+    "onnx2tf": "1.26.3",
+    "tensorflow": "2.19.0",
+    "quantizer": "NXP eIQ Neutron SDK 3.2.1",
+    "calibration_method": "Percentile",
+    "percentile": 99.99,
+    "profile_sha256": "aba78ba5683f19d0adc4abb2a5a59b4619cbc1c16a84512a72d84d4ea57d56d2",
+    "profile_source": "128 measured synthetic vehicle crops from urban-challenge-08; separate canopy recording used for replay validation",
+    "float_tflite_sha256": "138450568a58e967d9e2862cba771513e763d46180da5b050a0e6225a39d3a2d",
+    "int8_sha256": "ed1dbbe179da28699a079cd78a98756883683a07633086c35d6d7a11ca1a75f3",
+    "frame_selection": "Recorded source timestamps mapped to MP4 presentation timestamps; variable-rate frame-number seeking is not used"
+  },
+  "qualification": {
+    "float_conversion_cosine": 0.99999988,
+    "calibration_int8_cosine_min": 0.8242924809455872,
+    "calibration_int8_cosine_mean": 0.8888898454606533,
+    "compiler_operators": 83,
+    "compiler_cpu_operators": 0,
+    "board_npu_partitions": 1,
+    "board_cpu_graph_nodes": 0,
+    "note": "Quantization drift is material; NPU execution alone does not establish identity accuracy.",
+    "reference_samples": 16
+  }
+}

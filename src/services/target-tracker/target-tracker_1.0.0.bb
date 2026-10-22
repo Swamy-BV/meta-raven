@@ -10,10 +10,14 @@ DEPENDS = "\
     ament-cmake-native \
     bytetrack \
     diagnostic-msgs \
+    gdk-pixbuf \
+    neutron-runtime \
     rcl-interfaces \
     rclcpp \
+    sensor-msgs \
     std-msgs \
     std-srvs \
+    tensorflow-lite \
     vision-msgs \
 "
 SRC_URI = "\
@@ -21,7 +25,7 @@ SRC_URI = "\
     file://target-tracker.yaml \
 "
 ROS_BPN = "target_tracker"
-inherit ros_distro_jazzy ros_component ros_ament_cmake systemd
+inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd
 
 SYSTEMD_SERVICE:${PN} = "target-tracker.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
@@ -31,10 +35,13 @@ RDEPENDS:${PN} = "\
     raven-ros-config \
     rclcpp \
     rmw-cyclonedds-cpp \
+    sensor-msgs \
     std-msgs \
     std-srvs \
     vision-msgs \
 "
+
+RRECOMMENDS:${PN}:append:mx95-nxp-bsp = " model-vehicle-reid-neutron"
 
 do_install:append() {
     install -D -m 0644 ${UNPACKDIR}/target-tracker.yaml ${D}${sysconfdir}/target-tracker.yaml

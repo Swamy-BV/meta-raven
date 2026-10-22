@@ -12,11 +12,17 @@ find_package(rcl_interfaces REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(NeutronRuntime 1.0 CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PIXBUF REQUIRED IMPORTED_TARGET gdk-pixbuf-2.0)
+find_library(TFLITE_LIBRARY NAMES tensorflow-lite REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(ByteTrack 1.0 CONFIG REQUIRED)
-add_executable(target-tracker main.cpp core/tracker.cpp adapters/ros/node.cpp)
+add_executable(target-tracker main.cpp adapters/bytetrack/tracker.cpp adapters/bytetrack/appearance.cpp
+                              adapters/neutron/vehicle_encoder.cpp adapters/ros/node.cpp adapters/ros/appearance.cpp)
 target_include_directories(target-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(target-tracker ByteTrack::ByteTrack)
+target_link_libraries(target-tracker ByteTrack::ByteTrack Neutron::Runtime PkgConfig::PIXBUF ${TFLITE_LIBRARY})
 ament_target_dependencies(
   target-tracker
   SYSTEM
@@ -25,6 +31,7 @@ ament_target_dependencies(
   vision_msgs
   diagnostic_msgs
   std_msgs
+  sensor_msgs
   std_srvs)
 install(TARGETS target-tracker RUNTIME DESTINATION lib/${PROJECT_NAME})
 ament_package()

@@ -69,7 +69,8 @@ void GuidanceNode::Configure() {
                     number("camera_down", 0)};
   motion_ = MotionEstimator(
       number("target_position_stddev", kTargetPositionStddev),
-      number("target_acceleration_noise", kTargetAccelerationNoise));
+      number("target_acceleration_noise", kTargetAccelerationNoise),
+      loss_timeout_seconds_);
   ValidateConfiguration();
 }
 

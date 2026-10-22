@@ -1,0 +1,164 @@
+From: Raven developers
+Subject: [PATCH] Inject source-indexed appearance association without changing track layouts
+
+Upstream-Status: Inappropriate [embedded specific]
+
+Signed-off-by: Raven developers <noreply@raven.local>
+
+--- a/deploy/TensorRT/cpp/include/BYTETracker.h
++++ b/deploy/TensorRT/cpp/include/BYTETracker.h
+@@ -1,6 +1,14 @@
+ #pragma once
+ 
+ #include "STrack.h"
++#include <functional>
++
++// Hooks are synchronous for one update; indices refer to the original input objects.
++// Empty hooks preserve IoU association. Object and track memory layouts are unchanged.
++struct AssociationHooks {
++    std::function<void(vector<vector<float>>&, const vector<STrack*>&, const vector<STrack>&, const vector<size_t>&)> refine;
++    std::function<void(const STrack&, size_t)> measured;
++};
+ 
+ struct Object
+ {
+@@ -16,6 +24,8 @@
+ 	~BYTETracker();
+ 
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step);
++	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks);
++    vector<int> retained_ids() const;
+ 	size_t size() const { return tracked_stracks.size() + lost_stracks.size(); }
+ 
+ private:
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -19,6 +19,19 @@
+ }
+ 
+ vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step)
++{
++    return update(objects, stamp_seconds, step, {});
++}
++
++vector<int> BYTETracker::retained_ids() const
++{
++    vector<int> result;
++    for (const auto& track : tracked_stracks) result.push_back(track.track_id);
++    for (const auto& track : lost_stracks) result.push_back(track.track_id);
++    return result;
++}
++
++vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks)
+ {
+ 
+ 	////////////////// Step 1: Get detections //////////////////
+@@ -37,6 +50,7 @@
+ 	vector<STrack> lost_stracks;
+ 	vector<STrack> detections;
+ 	vector<STrack> detections_low;
++    vector<size_t> detection_ids, low_detection_ids, copied_detection_ids;
+ 
+ 	vector<STrack> detections_cp;
+ 	vector<STrack> tracked_stracks_swap;
+@@ -65,10 +79,12 @@
+ 			if (score >= track_thresh)
+ 			{
+ 				detections.push_back(strack);
++                detection_ids.push_back(i);
+ 			}
+ 			else
+ 			{
+ 				detections_low.push_back(strack);
++                low_detection_ids.push_back(i);
+ 			}
+ 			
+ 		}
+@@ -90,6 +106,7 @@
+ 	vector<vector<float> > dists;
+ 	int dist_size = 0, dist_size_size = 0;
+ 	dists = iou_distance(strack_pool, detections, dist_size, dist_size_size);
++    if (hooks.refine) hooks.refine(dists, strack_pool, detections, detection_ids);
+ 
+ 	vector<vector<int> > matches;
+ 	vector<int> u_track, u_detection;
+@@ -103,12 +120,14 @@
+ 		{
+ 			track->update(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
++            if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+ 			activated_stracks.push_back(*track);
+ 		}
+ 		else
+ 		{
+ 			track->re_activate(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
++            if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+ 			refind_stracks.push_back(*track);
+ 		}
+ 	}
+@@ -117,9 +136,11 @@
+ 	for (int i = 0; i < u_detection.size(); i++)
+ 	{
+ 		detections_cp.push_back(detections[u_detection[i]]);
++        copied_detection_ids.push_back(detection_ids[u_detection[i]]);
+ 	}
+ 	detections.clear();
+ 	detections.assign(detections_low.begin(), detections_low.end());
++    detection_ids = low_detection_ids;
+ 	
+ 	for (int i = 0; i < u_track.size(); i++)
+ 	{
+@@ -134,6 +155,7 @@
+ 
+ 	dists.clear();
+ 	dists = iou_distance(r_tracked_stracks, detections, dist_size, dist_size_size);
++    if (hooks.refine) hooks.refine(dists, r_tracked_stracks, detections, detection_ids);
+ 
+ 	matches.clear();
+ 	u_track.clear();
+@@ -148,12 +170,14 @@
+ 		{
+ 			track->update(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
++            if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+ 			activated_stracks.push_back(*track);
+ 		}
+ 		else
+ 		{
+ 			track->re_activate(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
++            if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+ 			refind_stracks.push_back(*track);
+ 		}
+ 	}
+@@ -171,9 +195,11 @@
+ 	// Deal with unconfirmed tracks, usually tracks with only one beginning frame
+ 	detections.clear();
+ 	detections.assign(detections_cp.begin(), detections_cp.end());
++    detection_ids = copied_detection_ids;
+ 
+ 	dists.clear();
+ 	dists = iou_distance(unconfirmed, detections, dist_size, dist_size_size);
++    if (hooks.refine) hooks.refine(dists, unconfirmed, detections, detection_ids);
+ 
+ 	matches.clear();
+ 	vector<int> u_unconfirmed;
+@@ -184,6 +210,7 @@
+ 	{
+ 		unconfirmed[matches[i][0]]->update(detections[matches[i][1]], this->frame_id);
+         unconfirmed[matches[i][0]]->last_seen_seconds = stamp_seconds;
++        if (hooks.measured) hooks.measured(*unconfirmed[matches[i][0]], detection_ids[matches[i][1]]);
+ 		activated_stracks.push_back(*unconfirmed[matches[i][0]]);
+ 	}
+ 
+@@ -207,6 +234,7 @@
+             throw std::overflow_error("ByteTrack ID counter exhausted; reset required");
+         track->activate(this->kalman_filter, this->frame_id, ++next_id_);
+         track->last_seen_seconds = stamp_seconds;
++        if (hooks.measured) hooks.measured(*track, detection_ids[u_detection[i]]);
+ 		activated_stracks.push_back(*track);
+ 	}
+ 
+-- 
+2.34.1

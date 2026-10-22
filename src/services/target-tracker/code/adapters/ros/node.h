@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,7 +17,9 @@
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/timer.hpp>
 
+#include "adapters/neutron/vehicle_encoder.h"
 #include "core/tracker.h"
+#include "sensor_msgs/msg/image.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include "vision_msgs/msg/vision_info.hpp"
@@ -32,6 +35,17 @@ class TrackingNode final : public rclcpp::Node {
  private:
   void Configure();
   void Connect();
+  void Frame(const sensor_msgs::msg::Image::ConstSharedPtr& message);
+  void Encode(std::vector<Observation>& observations,
+              const std_msgs::msg::Header& header);
+  std::unique_ptr<VehicleEncoder> encoder_;
+  std::deque<sensor_msgs::msg::Image::ConstSharedPtr> frames_;
+  std::string image_topic_, reid_model_;
+  std::vector<std::string> vehicle_classes_;
+  std::size_t encoded_crops_ = 0;
+  std::size_t missing_frames_ = 0;
+  double reid_milliseconds_ = 0;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr images_;
   void Receive(const vision_msgs::msg::Detection2DArray& message);
   void Metadata(const vision_msgs::msg::VisionInfo& message);
   std::vector<Observation> Observations(

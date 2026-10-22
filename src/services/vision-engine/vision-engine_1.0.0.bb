@@ -12,6 +12,7 @@ DEPENDS = "\
     gdk-pixbuf \
     glib-2.0 \
     microsoft-gsl \
+    neutron-runtime \
     nlohmann-json \
     onnxruntime \
     platform-contracts \

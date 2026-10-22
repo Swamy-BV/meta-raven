@@ -19,6 +19,7 @@ find_package(PkgConfig REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(Microsoft.GSL CONFIG REQUIRED)
 find_package(Threads REQUIRED)
+find_package(NeutronRuntime 1.0 CONFIG REQUIRED)
 pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0 gio-unix-2.0)
 pkg_check_modules(PIXBUF REQUIRED IMPORTED_TARGET gdk-pixbuf-2.0)
 pkg_check_modules(ONNX REQUIRED IMPORTED_TARGET libonnxruntime)
@@ -32,7 +33,6 @@ add_executable(
   inference_worker.cpp
   onnx_model.cpp
   yolov8_model.cpp
-  neutron_backend.cpp
   adapters/ros/frame_input.cpp
   adapters/ros/node.cpp)
 target_include_directories(vision-engine PRIVATE ${TFLITE_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -46,6 +46,7 @@ target_link_libraries(
   PkgConfig::ONNX
   Threads::Threads
   Raven::platform-contracts
+  Neutron::Runtime
   ${TFLITE_LIBRARY}
   ${CMAKE_DL_LIBS})
 ament_target_dependencies(

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-#include "tracker.h"
+#include "core/tracker.h"
 
 #include <BYTETracker.h>
 #include <STrack.h>
@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <map>
 #include <memory>
@@ -19,6 +20,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "adapters/bytetrack/appearance.h"
 
 namespace raven::tracking {
 namespace {
@@ -52,7 +55,27 @@ void Validate(const Configuration& value) {
   }
 }
 
+void ValidateAppearance(const std::vector<float>& descriptor) {
+  if (descriptor.empty()) {
+    return;
+  }
+  constexpr std::size_t kDescriptorSize = 512;
+  constexpr double kNormTolerance = 0.01;
+  double norm = 0;
+  for (const auto element : descriptor) {
+    if (!std::isfinite(element)) {
+      throw std::invalid_argument("non-finite appearance descriptor");
+    }
+    norm += static_cast<double>(element) * static_cast<double>(element);
+  }
+  if (descriptor.size() != kDescriptorSize ||
+      std::abs(norm - 1.0) > kNormTolerance) {
+    throw std::invalid_argument("invalid appearance descriptor size or norm");
+  }
+}
+
 void Validate(const Observation& value) {
+  ValidateAppearance(value.appearance);
   const auto& box = value.box;
   if (value.class_id.empty() || value.class_id.size() > kMaxClassLength ||
       !Probability(value.score) || !std::isfinite(box.center_x) ||
@@ -85,6 +108,10 @@ Object UpstreamObject(const Observation& value, const int label) {
 }
 }  // namespace
 
+void ValidateObservation(const Observation& observation) {
+  Validate(observation);
+}
+
 class Tracker::Impl {
  public:
   explicit Impl(Configuration configuration)
@@ -96,20 +123,29 @@ class Tracker::Impl {
                             std::int64_t stamp_ns);
   void Reset();
   [[nodiscard]] std::size_t RetainedCount() const;
+  [[nodiscard]] AppearanceStatistics AppearanceHealth() const;
 
  private:
   struct ClassState {
     std::unique_ptr<BYTETracker> tracker;
     std::size_t number = 0;
+    AppearanceAssociation appearance;
   };
 
-  using Groups = std::map<std::string, std::vector<Object>>;
+  struct GroupedObservations {
+    std::vector<Object> objects;
+    std::vector<std::size_t> indices;
+  };
+
+  using Groups = std::map<std::string, GroupedObservations>;
   [[nodiscard]] Groups Group(const std::vector<Observation>& observations);
   int LabelCode(const std::string& label);
+  [[nodiscard]] std::string GroupKey(const Observation& observation) const;
   void AddClasses(const Groups& groups);
   void Prune();
   [[nodiscard]] Track Output(const STrack& value, const std::string& label,
                              std::size_t number) const;
+  AppearanceStatistics retired_;
   Configuration config_;
   const std::string instance_;
   std::uint64_t generation_ = 0;
@@ -125,17 +161,31 @@ Tracker::Impl::Groups Tracker::Impl::Group(
     throw std::invalid_argument("detection count exceeds configured limit");
   }
   Groups groups;
-  for (const auto& observation : observations) {
+  for (std::size_t index = 0; index < observations.size(); ++index) {
+    const auto& observation = observations[index];
     Validate(observation);
     if (observation.score >= config_.low_threshold) {
-      const auto& group =
-          config_.class_agnostic ? std::string("all") : observation.class_id;
-      groups[group].push_back(UpstreamObject(
+      const auto group = GroupKey(observation);
+      groups[group].objects.push_back(UpstreamObject(
           observation,
           config_.class_agnostic ? LabelCode(observation.class_id) : 0));
+      groups[group].indices.push_back(index);
     }
   }
   return groups;
+}
+
+std::string Tracker::Impl::GroupKey(const Observation& observation) const {
+  if (!config_.class_agnostic) {
+    return observation.class_id;
+  }
+  if (!config_.use_appearance) {
+    return "all";
+  }
+  // A vehicle embedding cannot associate a pedestrian. Merge only subjects of
+  // that model; retain ordinary class-aware tracking for all other categories.
+  return observation.appearance_subject ? "appearance"
+                                        : "label:" + observation.class_id;
 }
 
 int Tracker::Impl::LabelCode(const std::string& label) {
@@ -224,12 +274,18 @@ std::vector<Track> Tracker::Impl::Update(
                                kNanosPerSecond * kNominalFramesPerSecond)
           : 1.0F;
   std::vector<Track> result;
-  const std::vector<Object> empty;
+  const GroupedObservations empty;
   for (auto& [label, state] : classes_) {
     const auto found = groups.find(label);
+    const auto& group = found == groups.end() ? empty : found->second;
     const auto tracks = state.tracker->update(
-        found == groups.end() ? empty : found->second,
-        static_cast<double>(stamp_ns) / kNanosPerSecond, step);
+        group.objects, static_cast<double>(stamp_ns) / kNanosPerSecond, step,
+        config_.use_appearance
+            ? state.appearance.Bind(
+                  observations, group.indices,
+                  static_cast<double>(stamp_ns) / kNanosPerSecond)
+            : AssociationHooks{});
+    state.appearance.Prune(state.tracker->retained_ids());
     for (const auto& track : tracks) {
       result.push_back(Output(track, label, state.number));
     }
@@ -242,6 +298,8 @@ std::vector<Track> Tracker::Impl::Update(
 void Tracker::Impl::Prune() {
   for (auto entry = classes_.begin(); entry != classes_.end();) {
     if (entry->second.tracker->size() == 0) {
+      retired_.recoveries += entry->second.appearance.Recoveries();
+      retired_.rejections += entry->second.appearance.Rejections();
       entry = classes_.erase(entry);
     } else {
       ++entry;
@@ -254,6 +312,7 @@ void Tracker::Impl::Reset() {
     throw std::overflow_error("tracking generation exhausted");
   }
   classes_.clear();
+  retired_ = {};
   labels_.clear();
   next_class_ = 0;
   last_stamp_.reset();
@@ -268,6 +327,15 @@ std::size_t Tracker::Impl::RetainedCount() const {
   return count;
 }
 
+AppearanceStatistics Tracker::Impl::AppearanceHealth() const {
+  AppearanceStatistics result = retired_;
+  for (const auto& [label, state] : classes_) {
+    result.recoveries += state.appearance.Recoveries();
+    result.rejections += state.appearance.Rejections();
+  }
+  return result;
+}
+
 Tracker::Tracker(Configuration configuration)
     : impl_(std::make_unique<Impl>(configuration)) {}
 
@@ -279,6 +347,10 @@ std::vector<Track> Tracker::Update(const std::vector<Observation>& observations,
 }
 
 void Tracker::Reset() { impl_->Reset(); }
+
+AppearanceStatistics Tracker::AppearanceHealth() const {
+  return impl_->AppearanceHealth();
+}
 
 std::size_t Tracker::RetainedCount() const { return impl_->RetainedCount(); }
 }  // namespace raven::tracking

@@ -18,7 +18,21 @@ struct Observation {
   Box box;
   std::string class_id;
   double score = 0;
+  // Optional unit-length vehicle descriptor; empty means appearance
+  // unavailable.
+  std::vector<float> appearance;
+  // Eligible for this embedding model even when its source image is missing.
+  bool appearance_subject = false;
 };
+
+struct AppearanceStatistics {
+  std::size_t recoveries = 0;
+  std::size_t rejections = 0;
+};
+
+// Reject invalid geometry, class, score or non-unit descriptors before adapters
+// perform allocation or inference. Throws std::invalid_argument on failure.
+void ValidateObservation(const Observation& observation);
 
 struct Track {
   Observation observation;
@@ -36,6 +50,7 @@ inline constexpr std::size_t kDefaultDetections = 128;
 
 struct Configuration {
   bool class_agnostic = false;
+  bool use_appearance = false;
   double lost_seconds = kDefaultLostSeconds;
   double low_threshold = kDefaultLowThreshold;
   double high_threshold = kDefaultHighThreshold;
@@ -64,6 +79,7 @@ class Tracker final {
                             std::int64_t stamp_ns);
   void Reset();
   [[nodiscard]] std::size_t RetainedCount() const;
+  [[nodiscard]] AppearanceStatistics AppearanceHealth() const;
 
  private:
   class Impl;

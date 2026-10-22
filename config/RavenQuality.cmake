@@ -86,6 +86,9 @@ if(RAVEN_QUALITY_TIDY OR RAVEN_QUALITY_IWYU)
     message(FATAL_ERROR "Cannot locate the Yocto Clang intrinsic headers")
   endif()
 endif()
+# Keep target libstdc++/libc paths, excluding GCC-only intrinsic/fixed headers.
+set(_raven_target_includes ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+list(FILTER _raven_target_includes EXCLUDE REGEX "/gcc/[^/]+/[^/]+/include(-fixed)?$")
 if(RAVEN_QUALITY_TIDY)
   find_program(RAVEN_CLANG_TIDY clang-tidy REQUIRED)
   execute_process(
@@ -100,7 +103,7 @@ if(RAVEN_QUALITY_TIDY)
                            "--header-filter=^${PROJECT_SOURCE_DIR}/|/raven/contracts/" --system-headers)
   list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-Wthread-safety" "--extra-arg=-isystem${_raven_resource_dir}/include")
   # Clang must see the target GCC's standard library, not the host's headers.
-  foreach(dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
+  foreach(dir IN LISTS _raven_target_includes)
     list(APPEND CMAKE_CXX_CLANG_TIDY "--extra-arg=-isystem${dir}")
   endforeach()
   if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -158,7 +161,7 @@ if(RAVEN_QUALITY_IWYU)
       -Xiwyu
       "--check_also=${PROJECT_SOURCE_DIR}/*"
       "-isystem${_raven_resource_dir}/include")
-  foreach(dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
+  foreach(dir IN LISTS _raven_target_includes)
     list(APPEND CMAKE_CXX_INCLUDE_WHAT_YOU_USE "-isystem${dir}")
   endforeach()
   if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")

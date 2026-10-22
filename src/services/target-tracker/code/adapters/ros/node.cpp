@@ -36,6 +36,7 @@ constexpr auto kNanosPerSecond = 1000000000LL;
 constexpr auto kFutureToleranceNs = 100000000LL;
 constexpr auto kMaxFrameLength = 256;
 constexpr auto kMaxModelLength = 256;
+constexpr std::size_t kMaximumVehicleClasses = 8;
 constexpr auto kMaxLocationLength = 1024;
 
 std::int64_t Stamp(const std_msgs::msg::Header& header) {
@@ -59,7 +60,8 @@ Observation ObservationMessage(const vision_msgs::msg::Detection2D& value) {
   return {{value.bbox.center.position.x, value.bbox.center.position.y,
            value.bbox.size_x, value.bbox.size_y},
           best->hypothesis.class_id,
-          best->hypothesis.score};
+          best->hypothesis.score,
+          {}};
 }
 
 vision_msgs::msg::Detection2D TrackMessage(
@@ -124,12 +126,34 @@ void TrackingNode::Configure() {
   config_.max_tracks_per_class = static_cast<std::size_t>(tracks);
   config_.max_classes = static_cast<std::size_t>(classes);
   config_.max_detections = static_cast<std::size_t>(detections);
+  reid_model_ =
+      declare_parameter<std::string>("vehicle_reid_model", "", options);
+  image_topic_ = declare_parameter<std::string>(
+      "image_topic", "/raven/vehicle_1/cameras/front/image_raw", options);
+  vehicle_classes_ = declare_parameter<std::vector<std::string>>(
+      "vehicle_classes", {"2", "5", "7"}, options);
+  if (!reid_model_.empty()) {
+    if (image_topic_.empty() || vehicle_classes_.empty() ||
+        vehicle_classes_.size() > kMaximumVehicleClasses) {
+      throw std::invalid_argument(
+          "invalid vehicle ReID image or class configuration");
+    }
+    encoder_ = std::make_unique<VehicleEncoder>(reid_model_);
+    config_.use_appearance = true;
+  }
   tracker_ = std::make_unique<Tracker>(config_);
   metadata_ready_ = metadata_topic_.empty();
   model_detection_ = metadata_ready_;
 }
 
 void TrackingNode::Connect() {
+  if (encoder_) {
+    images_ = create_subscription<sensor_msgs::msg::Image>(
+        image_topic_, rclcpp::SensorDataQoS().keep_last(1),
+        [this](const sensor_msgs::msg::Image::ConstSharedPtr& message) {
+          Frame(message);
+        });
+  }
   output_ = create_publisher<vision_msgs::msg::Detection2DArray>(
       "tracks", rclcpp::QoS(kOutputDepth).reliable());
   health_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
@@ -202,7 +226,9 @@ std::vector<Observation> TrackingNode::Observations(
       throw std::invalid_argument(
           "detection header mismatch or too many hypotheses");
     }
-    observations.push_back(ObservationMessage(detection));
+    const auto observation = ObservationMessage(detection);
+    ValidateObservation(observation);
+    observations.push_back(observation);
   }
   return observations;
 }
@@ -226,7 +252,8 @@ void TrackingNode::Receive(const vision_msgs::msg::Detection2DArray& message) {
     if (last_stamp_ && stamp <= *last_stamp_) {
       throw std::invalid_argument("duplicate or out-of-order detection");
     }
-    const auto observations = Observations(message);
+    auto observations = Observations(message);
+    Encode(observations, message.header);
     if (!frame_id_.empty() && frame_id_ != message.header.frame_id) {
       Reset("Camera optical frame changed");
     }
@@ -269,6 +296,7 @@ void TrackingNode::Reset(const std::string& reason) {
   }
   last_stamp_.reset();
   frame_id_.clear();
+  frames_.clear();
   stale_ = true;
   failed_ = false;
   published_count_ = 0;
@@ -315,7 +343,17 @@ void TrackingNode::PublishHealth() {
            {"input_timeout_seconds", std::to_string(input_timeout_seconds_)},
            {"lost_seconds", std::to_string(config_.lost_seconds)},
            {"retained_tracks", std::to_string(tracker_->RetainedCount())},
-           {"model_identity", model_key_}}) {
+           {"model_identity", model_key_},
+           {"vehicle_reid_model", reid_model_},
+           {"appearance_recoveries",
+            std::to_string(tracker_->AppearanceHealth().recoveries)},
+           {"appearance_rejections",
+            std::to_string(tracker_->AppearanceHealth().rejections)},
+           {"vehicle_reid_backend", encoder_ ? "neutron" : "disabled"},
+           {"vehicle_reid_cpu_nodes", encoder_ ? "0" : "unavailable"},
+           {"vehicle_reid_crops", std::to_string(encoded_crops_)},
+           {"vehicle_reid_missing_frames", std::to_string(missing_frames_)},
+           {"vehicle_reid_frame_ms", std::to_string(reid_milliseconds_)}}) {
     diagnostic_msgs::msg::KeyValue entry;
     entry.key = key;
     entry.value = value;

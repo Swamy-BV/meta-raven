@@ -8,6 +8,7 @@
 namespace raven::guidance {
 inline constexpr double kTargetPositionStddev = 0.35;
 inline constexpr double kTargetAccelerationNoise = 0.5;
+inline constexpr double kTargetMotionRetention = 1.5;
 
 struct MotionInnovation {
   Vector residual{};      // North/east measurement minus prediction, metres.
@@ -19,11 +20,13 @@ struct MotionInnovation {
 // Constant-velocity Kalman filter in local NED. Measurement deviation is in
 // metres; continuous white-acceleration spectral density is in m^2/s^3.
 // Rejected innovations do not renew source freshness or change identity.
+// Retention preserves state for reacquisition; it does not extend the age
+// limit on estimates returned for control.
 class MotionEstimator {
  public:
-  explicit MotionEstimator(
-      double position_stddev = kTargetPositionStddev,
-      double acceleration_noise = kTargetAccelerationNoise);
+  explicit MotionEstimator(double position_stddev = kTargetPositionStddev,
+                           double acceleration_noise = kTargetAccelerationNoise,
+                           double retention_seconds = kTargetMotionRetention);
   void Reset();
   bool Observe(const Vector& point, double stamp);
   [[nodiscard]] const std::optional<MotionInnovation>& LastInnovation() const;
@@ -42,6 +45,7 @@ class MotionEstimator {
                const Covariance& covariance, double stamp);
   double measurement_variance_ = 0;
   double acceleration_noise_ = 0;
+  double retention_seconds_ = 0;
   double stamp_ = 0;
   double first_stamp_ = 0;
   Covariance covariance_;
