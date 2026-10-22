@@ -54,7 +54,10 @@ void GuidanceNode::PublishHealth() {
     health.values.push_back(metric);
   };
   add("state", state_);
-  add("behavior", goal_ ? "go_to" : enabled_ ? "follow" : "none");
+  add("behavior", orbit_goal_ ? "orbit"
+                  : goal_     ? "go_to"
+                  : enabled_  ? "follow"
+                              : "none");
   add("obstacle_avoidance", "unavailable");
   add("unmapped_motion_enabled", allow_unmapped_motion_ ? "true" : "false");
   add("local_frame", local_frame_);
@@ -99,7 +102,9 @@ void GuidanceNode::PublishHealth() {
   add("yaw_reference_rad", std::to_string(command_.yaw));
   add("yaw_rate_reference_rad_s", std::to_string(command_.yaw_rate));
   add("projection",
-      "box-footpoint to configured level ground; rectified pixels");
+      orbit_goal_
+          ? "box-centre to supplied centre-height plane; rectified pixels"
+          : "box-footpoint to configured level ground; rectified pixels");
   report.status.push_back(health);
   health_->publish(report);
 }

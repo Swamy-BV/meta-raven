@@ -24,6 +24,7 @@ add_executable(
   behaviors/follow.cpp
   behaviors/trail.cpp
   behaviors/go_to.cpp
+  behaviors/orbit.cpp
   planning/trajectory.cpp
   validation/motion.cpp
   estimation/motion.cpp
@@ -31,6 +32,7 @@ add_executable(
   execution/controller.cpp
   adapters/ros/node.cpp
   adapters/ros/go_to.cpp
+  adapters/ros/orbit.cpp
   adapters/ros/execution.cpp
   adapters/ros/configuration.cpp
   adapters/ros/observations.cpp

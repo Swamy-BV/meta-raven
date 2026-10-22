@@ -20,6 +20,7 @@
 
 #include "behaviors/follow.h"
 #include "behaviors/go_to.h"
+#include "behaviors/orbit.h"
 #include "behaviors/trail.h"
 #include "core/types.h"
 #include "estimation/motion.h"
@@ -33,6 +34,7 @@
 #include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "raven_interfaces/action/go_to.hpp"
+#include "raven_interfaces/action/orbit.hpp"
 #include "raven_interfaces/srv/select_target.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "std_srvs/srv/set_bool.hpp"
@@ -59,6 +61,18 @@ class GuidanceNode final : public rclcpp::Node {
   using Enable = std_srvs::srv::SetBool;
   using GoTo = raven_interfaces::action::GoTo;
   using GoalHandle = rclcpp_action::ServerGoalHandle<GoTo>;
+  using Orbit = raven_interfaces::action::Orbit;
+  using OrbitHandle = rclcpp_action::ServerGoalHandle<Orbit>;
+  void ConnectOrbit();
+  [[nodiscard]] std::string PrepareOrbit(const Orbit::Goal& goal);
+  [[nodiscard]] std::string PlanOrbit(const Orbit::Goal& goal);
+  void StartOrbit(const std::shared_ptr<OrbitHandle>& goal);
+  void UpdateOrbit(const Pose& pose);
+  void ObserveOrbit(const Vector& point, std::int64_t stamp);
+  void UpdateOrbitPath(const Pose& pose);
+  void UpdateOrbitHeading(const Pose& pose);
+  void FinishOrbit(bool success, const std::string& message);
+  [[nodiscard]] bool HasAction() const;
   void ConnectGoTo();
   void ConnectTargetOutputs();
   void PublishPoint(
@@ -71,6 +85,7 @@ class GuidanceNode final : public rclcpp::Node {
       const std::shared_ptr<const GoTo::Goal>& goal);
   void StartGoTo(const std::shared_ptr<GoalHandle>& goal);
   void UpdateGoTo(const Pose& pose);
+  void UpdateAction(const Pose& pose);
   void FinishGoTo(bool success, const std::string& message);
   [[nodiscard]] bool ArmedOffboard() const;
   [[nodiscard]] Kinematics MeasuredMotion() const;
@@ -84,6 +99,7 @@ class GuidanceNode final : public rclcpp::Node {
   void ValidateConfiguration() const;
   void Connect();
   void ReceiveTracks(const vision_msgs::msg::Detection2DArray& message);
+  void ObserveFollowing(const Vector& point, std::int64_t stamp);
   void ReceiveInfo(const sensor_msgs::msg::CameraInfo& message);
   void ReceiveLabels(const vision_msgs::msg::LabelInfo& message);
   [[nodiscard]] bool Supported(
@@ -101,7 +117,8 @@ class GuidanceNode final : public rclcpp::Node {
   [[nodiscard]] bool FreshTarget() const;
   [[nodiscard]] Pose LatestPose() const;
   [[nodiscard]] Projection TargetPoint(
-      const vision_msgs::msg::Detection2D& detection);
+      const vision_msgs::msg::Detection2D& detection,
+      std::optional<double> center_height);
   void Tick();
   void UpdateCommand(const Pose& pose);
   void UpdateFollowingState();
@@ -122,6 +139,14 @@ class GuidanceNode final : public rclcpp::Node {
   Trajectory trajectory_;
   Destination destination_;
   std::shared_ptr<GoalHandle> goal_;
+  OrbitPlan orbit_plan_;
+  std::shared_ptr<OrbitHandle> orbit_goal_;
+  rclcpp_action::Server<Orbit>::SharedPtr orbit_action_;
+  double orbit_started_ = 0;
+  double orbit_azimuth_ = 0;
+  double orbit_travel_ = 0;
+  bool orbit_entering_ = false;
+  Clock::time_point selected_since_;
   bool goal_reserved_ = false;
   bool action_stopping_ = false;
   bool full_velocity_ = false;

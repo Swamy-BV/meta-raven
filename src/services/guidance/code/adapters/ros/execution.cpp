@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -20,6 +21,16 @@ namespace {
 constexpr double kMaximumControlGap = 0.25;
 constexpr double kNanoseconds = 1000000000.0;
 }  // namespace
+
+bool GuidanceNode::HasAction() const { return goal_ || orbit_goal_; }
+
+void GuidanceNode::UpdateAction(const Pose& pose) {
+  if (orbit_goal_) {
+    UpdateOrbit(pose);
+  } else {
+    UpdateGoTo(pose);
+  }
+}
 
 bool GuidanceNode::ArmedOffboard() const {
   return status_ &&
@@ -99,6 +110,7 @@ void GuidanceNode::StopOutput(const std::string& reason) {
   enabled_ = false;
   braking_ = false;
   FinishGoTo(false, reason);
+  FinishOrbit(false, reason);
   motion_.Reset();
   trail_.Reset();
   selected_id_.clear();

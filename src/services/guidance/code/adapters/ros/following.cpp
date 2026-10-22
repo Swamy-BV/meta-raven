@@ -46,6 +46,9 @@ void GuidanceNode::SelectTarget(const Select::Request& request,
   }
   motion_.Reset();
   trail_.Reset();
+  target_.reset();
+  target_stamp_ns_ = 0;
+  selected_since_ = Clock::now();
   selected_id_ = request.track_id;
   selected_frame_ = tracks_.header.frame_id;
   selected_class_ = found->results.front().hypothesis.class_id;
@@ -59,7 +62,7 @@ void GuidanceNode::EnableFollowing(const Enable::Request& request,
                                    Enable::Response& response) {
   response.success = false;
   if (goal_reserved_) {
-    response.message = "GoTo owns motion; cancel its action first";
+    response.message = "An action owns motion; cancel it first";
     return;
   }
   if (request.data && braking_ && !enabled_) {
@@ -109,7 +112,7 @@ void GuidanceNode::EnableFollowing(const Enable::Request& request,
     response.message = "Selected target is no longer visible";
     return;
   }
-  const auto projection = TargetPoint(*found);
+  const auto projection = TargetPoint(*found, std::nullopt);
   target_ = projection.point;
   if (!target_) {
     response.message = projection.reason;

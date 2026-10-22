@@ -1,0 +1,20 @@
+# Orbit the explicitly selected stationary person/car once, then hold.
+# Radius is horizontal metres; altitude stays at the current local height.
+# Speed is an upper bound, not a guaranteed cruise speed. Centre is frozen from
+# calibrated imagery and the supplied centre-height prior. No obstacle avoidance or auto-arming.
+float64 radius 8.0
+float64 max_speed 1.0
+# Height of the selected object's visual centre above the level ground, metres.
+# This geometric prior supplies range; monocular boxes alone do not measure depth.
+float64 target_center_height 0.75
+bool clockwise true
+float64 timeout 180.0
+bool allow_unmapped_motion false
+---
+bool success
+string message
+---
+# Measured directed angular travel, radians; 2*pi is one full orbit.
+float64 angle_completed
+float64 radius_error
+string state

@@ -19,6 +19,7 @@ GuidanceNode::GuidanceNode() : Node("guidance", "/raven/vehicle_1/autonomy") {
   Configure();
   Connect();
   ConnectGoTo();
+  ConnectOrbit();
   ConnectTargetOutputs();
 }
 
@@ -85,7 +86,7 @@ void GuidanceNode::Hold(const std::string& reason) {
     StopOutput("Cannot brake with stale telemetry: " + reason);
     return;
   }
-  if (goal_ && !action_stopping_) {
+  if (HasAction() && !action_stopping_) {
     full_velocity_ = true;
     action_stopping_ = true;
   }
@@ -119,20 +120,21 @@ void GuidanceNode::Tick() {
     return;
   }
   const auto pose = LatestPose();
-  if ((enabled_ || (goal_ && !action_stopping_)) &&
+  if ((enabled_ || (HasAction() && !action_stopping_)) &&
       std::hypot(pose.position[0] - origin_[0], pose.position[1] - origin_[1]) >
           max_displacement_) {
     Hold("Guidance displacement limit reached");
   }
-  if (goal_ && !action_stopping_) {
-    UpdateGoTo(pose);
+  if (HasAction() && !action_stopping_) {
+    UpdateAction(pose);
   } else if (enabled_) {
     UpdateFollowingState();
     UpdateCommand(pose);
   }
   UpdateBraking(pose);
-  if (goal_ && action_stopping_ && !braking_) {
+  if (HasAction() && action_stopping_ && !braking_) {
     FinishGoTo(false, reason_);
+    FinishOrbit(false, reason_);
   }
   if (streaming_) {
     PublishCommand();
@@ -186,7 +188,7 @@ void GuidanceNode::UpdateBraking(const Pose& pose) {
 }
 
 void GuidanceNode::PublishCommand() {
-  if (goal_ && !action_stopping_) {
+  if (HasAction() && !action_stopping_) {
     PublishTrajectory();
     return;
   }

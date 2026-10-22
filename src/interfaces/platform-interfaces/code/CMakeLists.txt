@@ -19,6 +19,7 @@ rosidl_generate_interfaces(
   "srv/SelectTarget.srv"
   "action/CapturePhotos.action"
   "action/GoTo.action"
+  "action/Orbit.action"
   DEPENDENCIES
   std_msgs
   geometry_msgs

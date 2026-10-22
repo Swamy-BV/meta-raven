@@ -1,5 +1,5 @@
 SUMMARY = "Modular PX4 motion guidance"
-DESCRIPTION = "ROS GoTo and selected-target following with bounded motion, explicit command ownership and loss hold"
+DESCRIPTION = "ROS GoTo, selected-target following and orbit with bounded motion, exclusive ownership and loss hold"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"
 SECTION = "robotics"

@@ -199,7 +199,7 @@ void GuidanceNode::FinishGoTo(const bool success, const std::string& message) {
 
 void GuidanceNode::PublishTrajectory() {
   if (!smooth_motion_) {
-    StopOutput("GoTo sample unavailable");
+    StopOutput("Action trajectory sample unavailable");
     return;
   }
   const auto nan = std::numeric_limits<float>::quiet_NaN();
@@ -219,7 +219,7 @@ void GuidanceNode::PublishTrajectory() {
   }
   setpoint.jerk = {nan, nan, nan};
   setpoint.yaw = static_cast<float>(command_.yaw);
-  setpoint.yawspeed = nan;
+  setpoint.yawspeed = orbit_goal_ ? static_cast<float>(command_.yaw_rate) : nan;
   mode_->publish(mode);
   setpoint_->publish(setpoint);
   ++setpoints_sent_;

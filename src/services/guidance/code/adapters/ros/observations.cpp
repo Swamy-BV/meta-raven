@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -10,6 +11,7 @@
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/time.hpp"
+#include <rclcpp_action/server_goal_handle.hpp>
 
 #include "behaviors/follow.h"
 #include "behaviors/trail.h"
@@ -18,6 +20,7 @@
 #include "estimation/pose.h"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "node.h"
+#include "raven_interfaces/action/orbit.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "util.h"
 #include "vision_msgs/msg/detection2_d.hpp"
@@ -42,7 +45,7 @@ void GuidanceNode::PublishPoint(
     const Vector& point,
     const rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr&
         publisher) const {
-  // Ground-plane estimates preserve the image capture time and local NED frame.
+  // Projected estimates preserve image capture time and the local NED frame.
   geometry_msgs::msg::PointStamped message;
   message.header.stamp = tracks_.header.stamp;
   message.header.frame_id = local_ned_frame_;
@@ -69,7 +72,7 @@ bool GuidanceNode::FreshTracks() const {
 void GuidanceNode::ReceiveInfo(const sensor_msgs::msg::CameraInfo& message) {
   if (!ValidCalibration(message)) {
     info_.reset();
-    if (enabled_) {
+    if (enabled_ || orbit_goal_) {
       Hold("Calibrated rectified camera data unavailable");
     }
     return;
@@ -95,7 +98,8 @@ void GuidanceNode::ReceiveLabels(const vision_msgs::msg::LabelInfo& message) {
   if (stamp < label_stamp_ || message.class_map.size() > kMaxLabels) {
     return;
   }
-  if ((enabled_ || state_ == "selected") && stamp != model_stamp_) {
+  if ((enabled_ || orbit_goal_ || state_ == "selected") &&
+      stamp != model_stamp_) {
     Hold("Vision labels changed; select the target again");
     selected_id_.clear();
   }
@@ -117,8 +121,8 @@ void GuidanceNode::ReceiveMetadata(
   const auto key = message.database_location + ":" +
                    std::to_string(message.database_version) + ":" +
                    std::to_string(stamp);
-  if ((enabled_ || state_ == "selected") && !model_key_.empty() &&
-      model_key_ != key) {
+  if ((enabled_ || orbit_goal_ || state_ == "selected") &&
+      !model_key_.empty() && model_key_ != key) {
     Hold("Vision model changed; select the target again");
     selected_id_.clear();
   }
@@ -127,7 +131,8 @@ void GuidanceNode::ReceiveMetadata(
 }
 
 GuidanceNode::Projection GuidanceNode::TargetPoint(
-    const vision_msgs::msg::Detection2D& detection) {
+    const vision_msgs::msg::Detection2D& detection,
+    const std::optional<double> center_height) {
   alignment_.reset();
   if (!info_ || info_->header.frame_id != tracks_.header.frame_id) {
     return {std::nullopt, "Camera calibration/frame unavailable"};
@@ -137,12 +142,12 @@ GuidanceNode::Projection GuidanceNode::TargetPoint(
       detection.bbox.size_x <= 0 || detection.bbox.size_y <= 0) {
     return {std::nullopt, "Invalid selected-target box or class"};
   }
-  const Pixel foot{
-      detection.bbox.center.position.x,
-      detection.bbox.center.position.y + detection.bbox.size_y / 2};
+  const Pixel foot{detection.bbox.center.position.x,
+                   detection.bbox.center.position.y +
+                       (center_height ? 0 : detection.bbox.size_y / 2)};
   if (!Finite(foot.x) || !Finite(foot.y) || foot.x < 0 || foot.y < 0 ||
       foot.x >= info_->width || foot.y >= info_->height) {
-    return {std::nullopt, "Target footpoint outside the calibrated image"};
+    return {std::nullopt, "Target measurement outside the calibrated image"};
   }
   const auto timestamp = static_cast<std::uint64_t>(
       rclcpp::Time(tracks_.header.stamp).nanoseconds() / kNanosPerMicro);
@@ -152,7 +157,11 @@ GuidanceNode::Projection GuidanceNode::TargetPoint(
     return {std::nullopt,
             "Image timestamp lacks bracketing vehicle pose within 100 ms"};
   }
-  const auto point = ProjectGround(foot, camera_, alignment_->pose, config_);
+  auto plane = config_;
+  if (center_height) {
+    plane.ground_z -= *center_height;
+  }
+  const auto point = ProjectGround(foot, camera_, alignment_->pose, plane);
   return {point,
           point ? "" : "Invalid pose, ground intersection or target range"};
 }
@@ -167,7 +176,8 @@ void GuidanceNode::ReceiveTracks(
     return;
   }
   tracks_ = message;
-  if ((!enabled_ && state_ != "selected") || !FreshTracks()) {
+  const bool active_orbit = orbit_goal_ && !action_stopping_;
+  if ((!enabled_ && !active_orbit && state_ != "selected") || !FreshTracks()) {
     return;
   }
   if (message.header.frame_id != selected_frame_) {
@@ -185,7 +195,11 @@ void GuidanceNode::ReceiveTracks(
     Hold("Selected target class changed");
     return;
   }
-  const auto projection = TargetPoint(*found);
+  const auto center_height =
+      active_orbit
+          ? std::optional<double>{orbit_goal_->get_goal()->target_center_height}
+          : std::nullopt;
+  const auto projection = TargetPoint(*found, center_height);
   if (!projection.point) {
     ++rejected_observations_;
     last_rejection_ = projection.reason;
@@ -194,14 +208,22 @@ void GuidanceNode::ReceiveTracks(
   }
   PublishPoint(*projection.point, observation_output_);
   const auto stamp = rclcpp::Time(message.header.stamp).nanoseconds();
-  if (!motion_.Observe(*projection.point,
-                       static_cast<double>(stamp) / kNanoseconds)) {
+  if (active_orbit) {
+    ObserveOrbit(*projection.point, stamp);
+    return;
+  }
+  ObserveFollowing(*projection.point, stamp);
+}
+
+void GuidanceNode::ObserveFollowing(const Vector& point,
+                                    const std::int64_t stamp) {
+  if (!motion_.Observe(point, static_cast<double>(stamp) / kNanoseconds)) {
     ++rejected_observations_;
     last_rejection_ = "Target position rejected by motion filter";
     PublishObservationHealth(last_rejection_);
     return;
   }
-  target_ = projection.point;
+  target_ = point;
   target_stamp_ns_ = stamp;
   const auto motion = motion_.Estimate(
       static_cast<double>(target_stamp_ns_) / kNanoseconds, config_.max_speed);
