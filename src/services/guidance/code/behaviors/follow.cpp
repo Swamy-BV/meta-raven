@@ -12,7 +12,6 @@ constexpr double kMinimumRayDown = 0.05;
 constexpr double kMinimumRange = 0.2;
 constexpr double kQuaternionTolerance = 0.01;
 constexpr double kFormationResponseSeconds = 0.7;
-constexpr double kHeadingResponseSeconds = 0.4;
 
 Vector LimitVelocity(const Vector& velocity, const double maximum) {
   const auto speed = std::hypot(velocity[0], velocity[1]);
@@ -180,7 +179,8 @@ Command Follow(const FollowInput& input, const Configuration& config) {
   // Vision arrives slower than the control tick. Filter its bearing before
   // differentiating it; direct heading steps amplify delayed pixel noise into
   // alternating yaw-rate feed-forward and an unstable image-centering loop.
-  const auto response = -std::expm1(-input.dt / kHeadingResponseSeconds);
+  const auto response =
+      -std::expm1(-input.dt / config.heading_response_seconds);
   const auto step = std::clamp(error * response, -yaw_step, yaw_step);
   return {desired, input.previous_yaw + step, bearing,
           input.dt > 0 ? step / input.dt : 0};

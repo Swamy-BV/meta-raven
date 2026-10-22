@@ -54,6 +54,8 @@ void GuidanceNode::Configure() {
   config_.max_acceleration =
       number("max_acceleration", config_.max_acceleration);
   config_.max_yaw_rate = number("max_yaw_rate", config_.max_yaw_rate);
+  config_.heading_response_seconds =
+      number("heading_response_seconds", config_.heading_response_seconds);
   config_.ground_z = number("ground_z", config_.ground_z);
   config_.minimum_height = number("minimum_height", config_.minimum_height);
   config_.maximum_height = number("maximum_height", config_.maximum_height);
@@ -79,6 +81,7 @@ void GuidanceNode::ValidateConfiguration() const {
       (!px4_namespace_.empty() && px4_namespace_.front() != '/') ||
       config_.distance <= 0 || config_.gain <= 0 || config_.max_speed <= 0 ||
       config_.max_acceleration <= 0 || config_.max_yaw_rate <= 0 ||
+      config_.heading_response_seconds <= 0 ||
       config_.max_range <= config_.distance || timeout_seconds_ <= 0 ||
       timeout_seconds_ > kTelemetryTimeout ||
       loss_timeout_seconds_ <= timeout_seconds_ ||

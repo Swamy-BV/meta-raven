@@ -33,6 +33,7 @@ inline constexpr double kDefaultGain = 0.4;
 inline constexpr double kDefaultSpeed = 1.5;
 inline constexpr double kDefaultAcceleration = 0.6;
 inline constexpr double kDefaultYawRate = 0.4;
+inline constexpr double kDefaultHeadingResponseSeconds = 0.4;
 inline constexpr double kDefaultHeadingSpeed = 0.2;
 inline constexpr double kDefaultRange = 40;
 inline constexpr double kDefaultMaximumHeight = 12;
@@ -43,6 +44,9 @@ struct Configuration {
   double max_speed = kDefaultSpeed;
   double max_acceleration = kDefaultAcceleration;
   double max_yaw_rate = kDefaultYawRate;
+  // First-order target-bearing response; larger values attenuate delayed
+  // image-bearing noise before it becomes aircraft yaw-rate feed-forward.
+  double heading_response_seconds = kDefaultHeadingResponseSeconds;
   double max_jerk = 1.0;
   double ground_z = 0;
   double minimum_height = 2;
