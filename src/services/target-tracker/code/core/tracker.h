@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace raven::tracking {
+// Row-major previous-to-current image similarity, in source-image pixels.
+inline constexpr std::size_t kAffineCoefficients = 6;
+using CameraTransform = std::array<float, kAffineCoefficients>;
+
 struct Box {
   double center_x = 0;
   double center_y = 0;
@@ -60,8 +66,9 @@ class Tracker final {
   Tracker& operator=(const Tracker&) = delete;
   Tracker(Tracker&&) = delete;
   Tracker& operator=(Tracker&&) = delete;
-  std::vector<Track> Update(const std::vector<Observation>& observations,
-                            std::int64_t stamp_ns);
+  std::vector<Track> Update(
+      const std::vector<Observation>& observations, std::int64_t stamp_ns,
+      const std::optional<CameraTransform>& camera_motion = std::nullopt);
   void Reset();
   [[nodiscard]] std::size_t RetainedCount() const;
 

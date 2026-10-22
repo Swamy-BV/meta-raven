@@ -16,7 +16,9 @@
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/timer.hpp>
 
+#include "adapters/opencv/camera_motion.h"
 #include "core/tracker.h"
+#include "sensor_msgs/msg/image.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include "vision_msgs/msg/vision_info.hpp"
@@ -32,6 +34,8 @@ class TrackingNode final : public rclcpp::Node {
  private:
   void Configure();
   void Connect();
+  void ConnectImages();
+  void ReceiveImage(const sensor_msgs::msg::Image& message);
   void Receive(const vision_msgs::msg::Detection2DArray& message);
   void Metadata(const vision_msgs::msg::VisionInfo& message);
   std::vector<Observation> Observations(
@@ -43,6 +47,11 @@ class TrackingNode final : public rclcpp::Node {
   void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth();
   Configuration config_;
+  bool camera_compensation_ = false;
+  std::string image_topic_;
+  CameraMotionEstimator camera_motion_;
+  CameraMotionResult compensation_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_input_;
   double input_timeout_seconds_ = 0;
   std::unique_ptr<Tracker> tracker_;
   std::string detections_topic_, metadata_topic_, frame_id_, model_key_;

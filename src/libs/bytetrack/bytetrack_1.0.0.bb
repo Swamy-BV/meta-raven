@@ -12,6 +12,7 @@ SRC_URI = "\
     file://0001-bound-tracking-and-use-acquisition-time.patch;patchdir=${UNPACKDIR}/bytetrack \
     file://0002-recover-retained-identities-with-weak-observations.patch;patchdir=${UNPACKDIR}/bytetrack \
     file://0003-keep-track-category.patch;patchdir=${UNPACKDIR}/bytetrack \
+    file://0004-camera-motion-compensation.patch;patchdir=${UNPACKDIR}/bytetrack \
 "
 SRCREV = "d1bf0191adff59bc8fcfeaa0b33d3d1642552a99"
 BB_GIT_SHALLOW = "1"
@@ -19,5 +20,5 @@ BB_GIT_SHALLOW = "1"
 inherit cmake raven_source
 
 CXXFLAGS:append = " -ffile-prefix-map=${UNPACKDIR}/bytetrack=/usr/src/debug/${PN}/${PV}/bytetrack"
-EXTRA_OECMAKE += "-DBYTETRACK_SOURCE_DIR=${UNPACKDIR}/bytetrack/deploy/TensorRT/cpp"
+EXTRA_OECMAKE += "-DBYTETRACK_SOURCE_DIR=${UNPACKDIR}/bytetrack/deploy/TensorRT/cpp -DBUILD_TESTING=OFF"
 RDEPENDS:${PN}-dev += "libeigen-dev"

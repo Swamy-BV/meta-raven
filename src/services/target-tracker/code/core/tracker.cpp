@@ -92,8 +92,9 @@ class Tracker::Impl {
     Validate(config_);
   }
 
-  std::vector<Track> Update(const std::vector<Observation>& observations,
-                            std::int64_t stamp_ns);
+  std::vector<Track> Update(
+      const std::vector<Observation>& observations, std::int64_t stamp_ns,
+      const std::optional<CameraTransform>& camera_motion);
   void Reset();
   [[nodiscard]] std::size_t RetainedCount() const;
 
@@ -206,7 +207,8 @@ Track Tracker::Impl::Output(const STrack& value, const std::string& label,
 }
 
 std::vector<Track> Tracker::Impl::Update(
-    const std::vector<Observation>& observations, std::int64_t stamp_ns) {
+    const std::vector<Observation>& observations, std::int64_t stamp_ns,
+    const std::optional<CameraTransform>& camera_motion) {
   if (stamp_ns <= 0 || (last_stamp_ && stamp_ns <= *last_stamp_)) {
     throw std::invalid_argument(
         "tracking requires increasing acquisition time");
@@ -229,7 +231,8 @@ std::vector<Track> Tracker::Impl::Update(
     const auto found = groups.find(label);
     const auto tracks = state.tracker->update(
         found == groups.end() ? empty : found->second,
-        static_cast<double>(stamp_ns) / kNanosPerSecond, step);
+        static_cast<double>(stamp_ns) / kNanosPerSecond, step,
+        camera_motion.value_or(CameraTransform{1, 0, 0, 0, 1, 0}));
     for (const auto& track : tracks) {
       result.push_back(Output(track, label, state.number));
     }
@@ -273,9 +276,10 @@ Tracker::Tracker(Configuration configuration)
 
 Tracker::~Tracker() = default;
 
-std::vector<Track> Tracker::Update(const std::vector<Observation>& observations,
-                                   std::int64_t stamp_ns) {
-  return impl_->Update(observations, stamp_ns);
+std::vector<Track> Tracker::Update(
+    const std::vector<Observation>& observations, std::int64_t stamp_ns,
+    const std::optional<CameraTransform>& camera_motion) {
+  return impl_->Update(observations, stamp_ns, camera_motion);
 }
 
 void Tracker::Reset() { impl_->Reset(); }

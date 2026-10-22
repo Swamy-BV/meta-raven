@@ -33,6 +33,13 @@ target_include_directories(bytetrack SYSTEM PUBLIC $<BUILD_INTERFACE:${BYTETRACK
                                                    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/bytetrack>)
 target_link_libraries(bytetrack PUBLIC Eigen3::Eigen)
 
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(bytetrack-camera-motion-test tests/camera_motion.cpp)
+  target_link_libraries(bytetrack-camera-motion-test PRIVATE ByteTrack::ByteTrack)
+  add_test(NAME bytetrack-camera-motion COMMAND bytetrack-camera-motion-test)
+endif()
+
 install(
   TARGETS bytetrack
   EXPORT ByteTrackTargets

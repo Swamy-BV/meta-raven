@@ -83,6 +83,7 @@ TrackingNode::TrackingNode()
     : Node("target_tracker", "/raven/vehicle_1/perception") {
   Configure();
   Connect();
+  ConnectImages();
 }
 
 void TrackingNode::Configure() {
@@ -97,6 +98,13 @@ void TrackingNode::Configure() {
   if (!std::isfinite(input_timeout_seconds_) || input_timeout_seconds_ <= 0 ||
       input_timeout_seconds_ > kMaxInputTimeoutSeconds) {
     throw std::invalid_argument("invalid detection input timeout");
+  }
+  camera_compensation_ =
+      declare_parameter<bool>("camera_motion_compensation", false, options);
+  image_topic_ = declare_parameter<std::string>(
+      "image_topic", "/raven/vehicle_1/cameras/front/image_raw", options);
+  if (camera_compensation_ && image_topic_.empty()) {
+    throw std::invalid_argument("Compensation image topic must be set");
   }
   config_.class_agnostic =
       declare_parameter<bool>("class_agnostic", false, options);
@@ -230,7 +238,12 @@ void TrackingNode::Receive(const vision_msgs::msg::Detection2DArray& message) {
     if (!frame_id_.empty() && frame_id_ != message.header.frame_id) {
       Reset("Camera optical frame changed");
     }
-    const auto result = tracker_->Update(observations, stamp);
+    if (camera_compensation_) {
+      compensation_ =
+          camera_motion_.Estimate(stamp, message.header.frame_id, observations);
+    }
+    const auto result =
+        tracker_->Update(observations, stamp, compensation_.transform);
     frame_id_ = message.header.frame_id;
     last_stamp_ = stamp;
     last_header_ = message.header;
@@ -262,6 +275,8 @@ void TrackingNode::Publish(const std::vector<Track>& tracks,
 
 void TrackingNode::Reset(const std::string& reason) {
   tracker_->Reset();
+  camera_motion_.Reset();
+  compensation_ = {};
   if (last_stamp_) {
     // Same acquisition header clears cached tracks; it is not a new
     // observation.
@@ -303,12 +318,17 @@ void TrackingNode::PublishHealth() {
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = "perception/tracking";
   status.hardware_id = frame_id_;
-  status.level = failed_  ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
-                 : stale_ ? diagnostic_msgs::msg::DiagnosticStatus::WARN
-                          : diagnostic_msgs::msg::DiagnosticStatus::OK;
+  const bool uncompensated = camera_compensation_ && !compensation_.transform;
+  status.level = failed_ ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
+                 : stale_ || uncompensated
+                     ? diagnostic_msgs::msg::DiagnosticStatus::WARN
+                     : diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = status_;
   for (const auto& [key, value] :
        std::vector<std::pair<std::string, std::string>>{
+           {"camera_motion", compensation_.status},
+           {"camera_motion_inliers", std::to_string(compensation_.inliers)},
+           {"camera_motion_ms", std::to_string(compensation_.milliseconds)},
            {"association",
             config_.class_agnostic ? "class-independent" : "per-class"},
            {"visible_tracks", std::to_string(published_count_)},

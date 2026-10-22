@@ -1,4 +1,6 @@
 [
+  { "include": [ "<opencv2/core/mat.inl.hpp>", "private", "<opencv2/core/mat.hpp>", "public" ] },
+  { "include": [ "<opencv2/core/hal/interface.h>", "private", "<opencv2/core/mat.hpp>", "public" ] },
   { "include": [ "\"../protocol.h\"", "private", "<mavlink/v2.0/common/mavlink.h>", "public" ] },
   { "include": [ "@[<\"]mavlink/v2[.]0/.*[>\"]", "private", "<mavlink/v2.0/common/mavlink.h>", "public" ] },
   { "symbol": [ "gint64", "private", "<glib.h>", "public" ] },

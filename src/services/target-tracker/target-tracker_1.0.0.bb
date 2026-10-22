@@ -10,8 +10,10 @@ DEPENDS = "\
     ament-cmake-native \
     bytetrack \
     diagnostic-msgs \
+    opencv \
     rcl-interfaces \
     rclcpp \
+    sensor-msgs \
     std-msgs \
     std-srvs \
     vision-msgs \
@@ -23,6 +25,8 @@ SRC_URI = "\
 ROS_BPN = "target_tracker"
 inherit ros_distro_jazzy ros_component ros_ament_cmake systemd
 
+EXTRA_OECMAKE += "-DBUILD_TESTING=OFF"
+
 SYSTEMD_SERVICE:${PN} = "target-tracker.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 CONFFILES:${PN} = "${sysconfdir}/target-tracker.yaml"
@@ -31,6 +35,7 @@ RDEPENDS:${PN} = "\
     raven-ros-config \
     rclcpp \
     rmw-cyclonedds-cpp \
+    sensor-msgs \
     std-msgs \
     std-srvs \
     vision-msgs \

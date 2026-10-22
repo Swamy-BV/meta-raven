@@ -1,0 +1,99 @@
+From: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+Subject: [PATCH] Transform retained Kalman states for camera motion
+
+Keep original API, measured-only output and association/expiry thresholds.
+
+Upstream-Status: Inappropriate [embedded specific]
+Signed-off-by: Raven maintainers <74085717+Swamy-BV@users.noreply.github.com>
+
+diff --git a/deploy/TensorRT/cpp/include/BYTETracker.h b/deploy/TensorRT/cpp/include/BYTETracker.h
+index 2dafeb0..1d45f4a 100644
+--- a/deploy/TensorRT/cpp/include/BYTETracker.h
++++ b/deploy/TensorRT/cpp/include/BYTETracker.h
+@@ -16,6 +16,7 @@ public:
+ 	~BYTETracker();
+ 
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step);
++	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const std::array<float, 6>& camera_motion);
+ 	size_t size() const { return tracked_stracks.size() + lost_stracks.size(); }
+ 
+ private:
+diff --git a/deploy/TensorRT/cpp/include/STrack.h b/deploy/TensorRT/cpp/include/STrack.h
+index 466f567..5abeeb5 100644
+--- a/deploy/TensorRT/cpp/include/STrack.h
++++ b/deploy/TensorRT/cpp/include/STrack.h
+@@ -21,6 +21,7 @@ public:
+ 
+ 	vector<float> static tlbr_to_tlwh(vector<float> &tlbr);
+ 	void static multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter, float step);
++	void apply_camera_motion(const std::array<float, 6>& transform);
+ 	void static_tlwh();
+ 	void static_tlbr();
+ 	vector<float> tlwh_to_xyah(vector<float> tlwh_tmp);
+diff --git a/deploy/TensorRT/cpp/src/BYTETracker.cpp b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+index 0aa1f0f..14712c3 100644
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -20,6 +20,16 @@ BYTETracker::~BYTETracker()
+ 
+ vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step)
+ {
++    return update(objects, stamp_seconds, step, {1, 0, 0, 0, 1, 0});
++}
++
++vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step,
++                                  const std::array<float, 6>& camera_motion)
++{
++    if (!std::all_of(camera_motion.begin(), camera_motion.end(), [](float v) { return std::isfinite(v); }) ||
++        std::hypot(camera_motion[0], camera_motion[3]) <= 0 ||
++        camera_motion[0] * camera_motion[4] - camera_motion[1] * camera_motion[3] <= 0)
++        throw std::invalid_argument("Invalid camera similarity");
+ 
+ 	////////////////// Step 1: Get detections //////////////////
+ 	if (frame_id == std::numeric_limits<int>::max())
+@@ -86,6 +96,13 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_s
+ 	////////////////// Step 2: First association, with IoU //////////////////
+ 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
+ 	STrack::multi_predict(strack_pool, this->kalman_filter, step);
++    // Compensate tracked/lost predictions before either association pass.
++    // Retaining a prediction never publishes it as an observation.
++    if (camera_motion != std::array<float, 6>{1, 0, 0, 0, 1, 0}) {
++        for (auto* track : strack_pool) track->apply_camera_motion(camera_motion);
++        for (auto* track : unconfirmed) track->apply_camera_motion(camera_motion);
++    }
++
+ 
+ 	vector<vector<float> > dists;
+ 	int dist_size = 0, dist_size_size = 0;
+diff --git a/deploy/TensorRT/cpp/src/STrack.cpp b/deploy/TensorRT/cpp/src/STrack.cpp
+index d3d51d0..98cab10 100644
+--- a/deploy/TensorRT/cpp/src/STrack.cpp
++++ b/deploy/TensorRT/cpp/src/STrack.cpp
+@@ -189,4 +189,25 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &
+ 		stracks[i]->static_tlwh();
+ 		stracks[i]->static_tlbr();
+ 	}
+-}
+\ No newline at end of file
++}
++// Transform the XYAH Kalman state after camera motion; aspect ratio stays
++// unchanged until a real measurement corrects viewpoint-dependent shape.
++void STrack::apply_camera_motion(const std::array<float, 6>& transform)
++{
++    const float scale = std::hypot(transform[0], transform[3]);
++    KAL_COVA jacobian = KAL_COVA::Identity();
++    for (int offset : {0, 4}) {
++        jacobian(offset, offset) = transform[0];
++        jacobian(offset, offset + 1) = transform[1];
++        jacobian(offset + 1, offset) = transform[3];
++        jacobian(offset + 1, offset + 1) = transform[4];
++    }
++    jacobian(3, 3) = scale;
++    jacobian(7, 7) = scale;
++    mean = (mean * jacobian.transpose()).eval();
++    mean[0] += transform[2];
++    mean[1] += transform[5];
++    covariance = (jacobian * covariance * jacobian.transpose()).eval();
++    static_tlwh();
++    static_tlbr();
++}

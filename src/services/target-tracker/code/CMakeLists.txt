@@ -14,9 +14,13 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(ByteTrack 1.0 CONFIG REQUIRED)
-add_executable(target-tracker main.cpp core/tracker.cpp adapters/ros/node.cpp)
+find_package(sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc video calib3d)
+add_executable(target-tracker main.cpp core/tracker.cpp adapters/ros/node.cpp adapters/ros/images.cpp
+                              adapters/opencv/camera_motion.cpp)
 target_include_directories(target-tracker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(target-tracker ByteTrack::ByteTrack)
+target_include_directories(target-tracker SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(target-tracker ByteTrack::ByteTrack ${OpenCV_LIBS})
 ament_target_dependencies(
   target-tracker
   SYSTEM
@@ -25,6 +29,15 @@ ament_target_dependencies(
   vision_msgs
   diagnostic_msgs
   std_msgs
-  std_srvs)
+  std_srvs
+  sensor_msgs)
 install(TARGETS target-tracker RUNTIME DESTINATION lib/${PROJECT_NAME})
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(camera-motion-test tests/camera_motion.cpp adapters/opencv/camera_motion.cpp)
+  target_include_directories(camera-motion-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(camera-motion-test SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+  target_link_libraries(camera-motion-test PRIVATE ${OpenCV_LIBS})
+  add_test(NAME camera-motion-estimation COMMAND camera-motion-test)
+endif()
 ament_package()

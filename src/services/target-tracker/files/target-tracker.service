@@ -8,6 +8,7 @@ StartLimitBurst=3
 Type=simple
 DynamicUser=yes
 LogsDirectory=target-tracker
+Environment=OPENCV_FOR_THREADS_NUM=1
 Environment=ROS_LOG_DIR=/var/log/target-tracker
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
