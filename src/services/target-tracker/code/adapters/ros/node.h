@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -18,7 +19,11 @@
 #include <rclcpp/timer.hpp>
 
 #include "adapters/neutron/vehicle_encoder.h"
+#include "core/ground_projector.h"
 #include "core/tracker.h"
+#include "px4_msgs/msg/vehicle_attitude.hpp"
+#include "px4_msgs/msg/vehicle_local_position.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
@@ -35,6 +40,23 @@ class TrackingNode final : public rclcpp::Node {
  private:
   void Configure();
   void Connect();
+  void ConfigureGround();
+  void ConnectGround();
+  void GroundPosition(const px4_msgs::msg::VehicleLocalPosition& message);
+  void GroundAttitude(const px4_msgs::msg::VehicleAttitude& message);
+  void GroundCalibrationInfo(const sensor_msgs::msg::CameraInfo& message);
+  void Locate(std::vector<Observation>& observations,
+              const std_msgs::msg::Header& header);
+  std::unique_ptr<GroundProjector> ground_;
+  std::string camera_info_topic_, px4_namespace_;
+  std::optional<std::array<std::uint8_t, 3>> position_resets_;
+  std::optional<std::uint8_t> attitude_reset_;
+  std::size_t ground_observations_ = 0, missing_ground_ = 0;
+  rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr
+      positions_;
+  rclcpp::Subscription<px4_msgs::msg::VehicleAttitude>::SharedPtr attitudes_;
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr calibration_;
+
   void Frame(const sensor_msgs::msg::Image::ConstSharedPtr& message);
   void Encode(std::vector<Observation>& observations,
               const std_msgs::msg::Header& header);

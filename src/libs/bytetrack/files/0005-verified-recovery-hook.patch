@@ -1,0 +1,49 @@
+From: Raven developers
+Subject: [PATCH] Add an ABI-compatible verified recovery overload
+
+Upstream-Status: Inappropriate [embedded specific]
+
+Signed-off-by: Raven developers <noreply@raven.local>
+
+--- a/deploy/TensorRT/cpp/include/BYTETracker.h
++++ b/deploy/TensorRT/cpp/include/BYTETracker.h
+@@ -25,6 +25,7 @@
+ 
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step);
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks);
++    vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover);
+     vector<int> retained_ids() const;
+ 	size_t size() const { return tracked_stracks.size() + lost_stracks.size(); }
+ 
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -32,6 +32,11 @@
+ }
+ 
+ vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks)
++{
++    return update(objects, stamp_seconds, step, hooks, {});
++}
++
++vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover)
+ {
+ 
+ 	////////////////// Step 1: Get detections //////////////////
+@@ -125,6 +130,7 @@
+ 		}
+ 		else
+ 		{
++            if (recover) recover(*track, detection_ids[matches[i][1]]);
+ 			track->re_activate(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
+             if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+@@ -175,6 +181,7 @@
+ 		}
+ 		else
+ 		{
++            if (recover) recover(*track, detection_ids[matches[i][1]]);
+ 			track->re_activate(*det, this->frame_id);
+             track->last_seen_seconds = stamp_seconds;
+             if (hooks.measured) hooks.measured(*track, detection_ids[matches[i][1]]);
+-- 
+2.34.1

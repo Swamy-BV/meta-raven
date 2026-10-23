@@ -5,9 +5,12 @@
 
 #include <cstddef>
 #include <deque>
+#include <functional>
 #include <map>
+#include <optional>
 #include <vector>
 
+#include "core/ground_motion.h"
 #include "core/tracker.h"
 
 namespace raven::tracking {
@@ -16,9 +19,14 @@ namespace raven::tracking {
 // synchronous ByteTrack update.
 class AppearanceAssociation final {
  public:
+  explicit AppearanceAssociation(bool ground_motion = false,
+                                 double retention = kDefaultLostSeconds);
   AssociationHooks Bind(const std::vector<Observation>& observations,
                         const std::vector<std::size_t>& indices, double stamp);
+  [[nodiscard]] std::function<void(STrack&, std::size_t)> Recovery() const;
   void Prune(const std::vector<int>& retained);
+  // Current update only; no predicted or stale box is returned.
+  [[nodiscard]] std::optional<Box> MeasuredBox(int identity) const;
 
   [[nodiscard]] std::size_t Recoveries() const { return recoveries_; }
 
@@ -30,6 +38,7 @@ class AppearanceAssociation final {
     double updated = 0;
     double seen = 0;
     Box observed_box;
+    GroundMotion ground;
   };
 
   using Costs = std::vector<std::vector<float>>;
@@ -37,6 +46,7 @@ class AppearanceAssociation final {
   void Refine(Costs& costs, const std::vector<STrack*>& tracks,
               const std::vector<std::size_t>& indices);
   void Measured(const STrack& track, std::size_t index);
+  void Recover(STrack& track, std::size_t index) const;
   [[nodiscard]] Costs BuildCosts(const std::vector<STrack*>& tracks,
                                  const std::vector<std::size_t>& indices,
                                  const Costs& proximity) const;
@@ -50,9 +60,12 @@ class AppearanceAssociation final {
   [[nodiscard]] float Distance(const Gallery& gallery,
                                const std::vector<float>& descriptor) const;
   std::map<int, Gallery> galleries_;
+  std::map<int, Box> measurements_;
   const std::vector<Observation>* observations_ = nullptr;
   const std::vector<std::size_t>* indices_ = nullptr;
   double stamp_ = 0;
+  bool ground_motion_ = false;
+  double retention_ = kDefaultLostSeconds;
   std::size_t recoveries_ = 0;
   std::size_t rejections_ = 0;
 };

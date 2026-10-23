@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <functional>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -22,6 +23,7 @@
 namespace raven::tracking {
 namespace {
 constexpr float kMaximumDistance = 0.3F;
+constexpr double kAppearanceWeight = 0.5;
 constexpr float kAmbiguityMargin = 0.05F;
 constexpr float kRejected = 1.0F;
 constexpr float kRecoveryCost = 0.6F;
@@ -29,6 +31,7 @@ constexpr float kMaximumRecoveryIouDistance = 0.8F;
 constexpr double kMinimumRecoveryOverlap =
     1.0 - static_cast<double>(kMaximumRecoveryIouDistance);
 constexpr double kGalleryInterval = 0.5;
+constexpr double kMaximumRecoveryAspectChange = 1.5;
 constexpr double kMinimumScore = 0.7;
 constexpr double kContinuitySeconds = 0.3;
 constexpr std::size_t kGallerySize = 8;
@@ -76,9 +79,14 @@ bool Unique(const std::vector<std::vector<float>>& costs, std::size_t row,
 }
 }  // namespace
 
+AppearanceAssociation::AppearanceAssociation(bool ground_motion,
+                                             double retention)
+    : ground_motion_(ground_motion), retention_(retention) {}
+
 AssociationHooks AppearanceAssociation::Bind(
     const std::vector<Observation>& observations,
     const std::vector<std::size_t>& indices, double stamp) {
+  measurements_.clear();
   observations_ = &observations;
   stamp_ = stamp;
   indices_ = &indices;
@@ -112,22 +120,53 @@ float AppearanceAssociation::Distance(
 float AppearanceAssociation::CandidateDistance(
     const STrack& track, const Observation& observation) const {
   const auto found = galleries_.find(track.track_id);
-  if (found == galleries_.end() || observation.appearance.empty() ||
-      !MotionAllows(track, observation.box)) {
+  if (found == galleries_.end() || observation.appearance.empty()) {
     return kRejected;
   }
-  return Distance(found->second, observation.appearance);
+  const auto appearance = Distance(found->second, observation.appearance);
+  const bool grounded = ground_motion_ && observation.ground_point &&
+                        found->second.ground.Initialized();
+  if ((ground_motion_ && track.state == TrackState::Lost) || grounded) {
+    const auto motion = observation.ground_point
+                            ? found->second.ground.Distance(
+                                  *observation.ground_point, stamp_, retention_)
+                            : std::nullopt;
+    if (!motion || appearance > kMaximumDistance) {
+      return kRejected;
+    }
+    // Compare positions in a pose-aligned frame; stale image coordinates are
+    // not a motion prior after the camera has translated or rotated.
+    return static_cast<float>(
+        kAppearanceWeight * static_cast<double>(appearance) +
+        (1 - kAppearanceWeight) * static_cast<double>(kMaximumDistance) *
+            *motion);
+  }
+  return MotionAllows(track, observation.box) ? appearance : kRejected;
 }
 
 bool AppearanceAssociation::RecoveryAllows(const STrack& track, const Box& box,
                                            float proximity) const {
-  if (track.state != TrackState::Lost ||
-      proximity <= kMaximumRecoveryIouDistance) {
+  if (track.state != TrackState::Lost) {
+    return true;
+  }
+  const auto found = galleries_.find(track.track_id);
+  if (ground_motion_) {
+    if (found == galleries_.end()) {
+      return false;
+    }
+    // A clipped vehicle box has no reliable ground contact point. Require
+    // shape continuity before using its footpoint to recover an identity.
+    const auto before =
+        found->second.observed_box.width / found->second.observed_box.height;
+    const auto ratio = box.width / box.height / before;
+    return ratio >= 1 / kMaximumRecoveryAspectChange &&
+           ratio <= kMaximumRecoveryAspectChange;
+  }
+  if (proximity <= kMaximumRecoveryIouDistance) {
     return true;
   }
   // Partial occlusion can corrupt image velocity. Check the last confident
   // observation as well as the prediction, while retaining the motion gate.
-  const auto found = galleries_.find(track.track_id);
   return found != galleries_.end() &&
          Overlap(found->second.observed_box, box) >= kMinimumRecoveryOverlap;
 }
@@ -168,11 +207,13 @@ void AppearanceAssociation::ApplyRow(const std::vector<std::size_t>& indices,
       continue;
     }
     const auto distance = appearance[row][column];
+    const bool grounded = ground_motion_ && measured.ground_point &&
+                          galleries_.at(track.track_id).ground.Initialized();
     if (distance > kMaximumDistance ||
-        (recovering && !Unique(appearance, row, column))) {
+        ((recovering || grounded) && !Unique(appearance, row, column))) {
       costs[column] = kRejected;
       ++rejections_;
-    } else if (recovering) {
+    } else if (recovering || grounded) {
       costs[column] = kRecoveryCost * distance / kMaximumDistance;
     }
   }
@@ -198,6 +239,7 @@ void AppearanceAssociation::Refine(Costs& costs,
 
 void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
   const auto& measured = Measurement(index);
+  measurements_.insert_or_assign(track.track_id, measured.box);
   auto found = galleries_.find(track.track_id);
   if (found != galleries_.end()) {
     if (stamp_ - found->second.seen > kContinuitySeconds &&
@@ -206,10 +248,17 @@ void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
     }
     found->second.seen = stamp_;
   }
+  if (found != galleries_.end() && measured.ground_point &&
+      measured.score >= kMinimumScore) {
+    found->second.ground.Observe(*measured.ground_point, stamp_, retention_);
+  }
   if (measured.appearance.empty() || measured.score < kMinimumScore) {
     return;
   }
   auto& gallery = galleries_[track.track_id];
+  if (measured.ground_point) {
+    gallery.ground.Observe(*measured.ground_point, stamp_, retention_);
+  }
   gallery.seen = stamp_;
   gallery.observed_box = measured.box;
   if (!gallery.descriptors.empty() &&
@@ -221,6 +270,39 @@ void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
     gallery.descriptors.pop_front();
   }
   gallery.updated = stamp_;
+}
+
+std::function<void(STrack&, std::size_t)> AppearanceAssociation::Recovery()
+    const {
+  if (!ground_motion_) {
+    return {};
+  }
+  return [this](auto& track, auto index) { Recover(track, index); };
+}
+
+void AppearanceAssociation::Recover(STrack& track, std::size_t index) const {
+  const auto& measured = Measurement(index);
+  if (!ground_motion_ || !measured.ground_point ||
+      galleries_.count(track.track_id) == 0) {
+    return;
+  }
+  DETECTBOX box;
+  box << static_cast<float>(measured.box.center_x),
+      static_cast<float>(measured.box.center_y),
+      static_cast<float>(measured.box.width / measured.box.height),
+      static_cast<float>(measured.box.height);
+  byte_kalman::KalmanFilter filter;
+  const auto state = filter.initiate(box);
+  // Verified ground/appearance association restores the measured image box.
+  // An occlusion-corrupted image velocity must not drag the output off it.
+  track.mean = state.first;
+  track.covariance = state.second;
+}
+
+std::optional<Box> AppearanceAssociation::MeasuredBox(int identity) const {
+  const auto found = measurements_.find(identity);
+  return found == measurements_.end() ? std::nullopt
+                                      : std::optional<Box>{found->second};
 }
 
 void AppearanceAssociation::Prune(const std::vector<int>& retained) {

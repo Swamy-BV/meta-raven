@@ -3,8 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
+
+#include "core/ground_motion.h"
 
 namespace raven::tracking {
 struct Box {
@@ -23,6 +26,8 @@ struct Observation {
   std::vector<float> appearance;
   // Eligible for this embedding model even when its source image is missing.
   bool appearance_subject = false;
+  // Optional calibrated ground-plane location at this image acquisition time.
+  std::optional<GroundPoint> ground_point = std::nullopt;
 };
 
 struct AppearanceStatistics {
@@ -51,6 +56,7 @@ inline constexpr std::size_t kDefaultDetections = 128;
 struct Configuration {
   bool class_agnostic = false;
   bool use_appearance = false;
+  bool use_ground_motion = false;
   double lost_seconds = kDefaultLostSeconds;
   double low_threshold = kDefaultLowThreshold;
   double high_threshold = kDefaultHighThreshold;

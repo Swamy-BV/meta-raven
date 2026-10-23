@@ -13,6 +13,7 @@ SRC_URI = "\
     file://0002-recover-retained-identities-with-weak-observations.patch;patchdir=${UNPACKDIR}/bytetrack \
     file://0003-keep-track-category.patch;patchdir=${UNPACKDIR}/bytetrack \
     file://0004-inject-association-policy.patch;patchdir=${UNPACKDIR}/bytetrack \
+    file://0005-verified-recovery-hook.patch;patchdir=${UNPACKDIR}/bytetrack \
 "
 SRCREV = "d1bf0191adff59bc8fcfeaa0b33d3d1642552a99"
 BB_GIT_SHALLOW = "1"

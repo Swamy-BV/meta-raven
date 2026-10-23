@@ -12,6 +12,7 @@ DEPENDS = "\
     diagnostic-msgs \
     gdk-pixbuf \
     neutron-runtime \
+    px4-msgs \
     rcl-interfaces \
     rclcpp \
     sensor-msgs \
@@ -32,6 +33,7 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 CONFFILES:${PN} = "${sysconfdir}/target-tracker.yaml"
 RDEPENDS:${PN} = "\
     diagnostic-msgs \
+    px4-msgs \
     raven-ros-config \
     rclcpp \
     rmw-cyclonedds-cpp \

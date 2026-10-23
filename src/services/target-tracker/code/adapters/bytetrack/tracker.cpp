@@ -41,6 +41,10 @@ bool Probability(double value) {
 }
 
 void Validate(const Configuration& value) {
+  if (value.use_ground_motion && !value.use_appearance) {
+    throw std::invalid_argument(
+        "Ground recovery requires appearance association");
+  }
   if (!Probability(value.low_threshold) || !Probability(value.high_threshold) ||
       !Probability(value.new_threshold) ||
       !Probability(value.match_threshold) ||
@@ -76,6 +80,10 @@ void ValidateAppearance(const std::vector<float>& descriptor) {
 
 void Validate(const Observation& value) {
   ValidateAppearance(value.appearance);
+  if (value.ground_point && (!std::isfinite((*value.ground_point)[0]) ||
+                             !std::isfinite((*value.ground_point)[1]))) {
+    throw std::invalid_argument("Non-finite ground observation");
+  }
   const auto& box = value.box;
   if (value.class_id.empty() || value.class_id.size() > kMaxClassLength ||
       !Probability(value.score) || !std::isfinite(box.center_x) ||
@@ -144,7 +152,8 @@ class Tracker::Impl {
   void AddClasses(const Groups& groups);
   void Prune();
   [[nodiscard]] Track Output(const STrack& value, const std::string& label,
-                             std::size_t number) const;
+                             std::size_t number,
+                             const std::optional<Box>& measured) const;
   AppearanceStatistics retired_;
   Configuration config_;
   const std::string instance_;
@@ -220,6 +229,8 @@ void Tracker::Impl::AddClasses(const Groups& groups) {
       throw std::overflow_error("tracking class counter exhausted");
     }
     state.number = next_class_++;
+    state.appearance =
+        AppearanceAssociation(config_.use_ground_motion, config_.lost_seconds);
     state.tracker = std::make_unique<BYTETracker>(
         config_.lost_seconds, static_cast<int>(config_.max_tracks_per_class),
         static_cast<float>(config_.high_threshold),
@@ -230,7 +241,8 @@ void Tracker::Impl::AddClasses(const Groups& groups) {
 }
 
 Track Tracker::Impl::Output(const STrack& value, const std::string& label,
-                            std::size_t number) const {
+                            std::size_t number,
+                            const std::optional<Box>& measured) const {
   if (value.tlwh.size() != 4) {
     throw std::runtime_error("invalid ByteTrack output shape");
   }
@@ -240,6 +252,14 @@ Track Tracker::Impl::Output(const STrack& value, const std::string& label,
                            static_cast<double>(value.tlwh[1]) +
                                static_cast<double>(value.tlwh[3]) * kHalf,
                            value.tlwh[2], value.tlwh[3]};
+  if (config_.use_ground_motion) {
+    if (!measured) {
+      throw std::runtime_error("Visible ground track lacks a measurement");
+    }
+    // Pose alignment uses acquisition time. An image-space filter lag must
+    // not become a false ground displacement when the camera moves.
+    track.observation.box = *measured;
+  }
   if (config_.class_agnostic &&
       (value.label < 0 ||
        static_cast<std::size_t>(value.label) >= labels_.size())) {
@@ -284,10 +304,12 @@ std::vector<Track> Tracker::Impl::Update(
             ? state.appearance.Bind(
                   observations, group.indices,
                   static_cast<double>(stamp_ns) / kNanosPerSecond)
-            : AssociationHooks{});
+            : AssociationHooks{},
+        state.appearance.Recovery());
     state.appearance.Prune(state.tracker->retained_ids());
     for (const auto& track : tracks) {
-      result.push_back(Output(track, label, state.number));
+      result.push_back(Output(track, label, state.number,
+                              state.appearance.MeasuredBox(track.track_id)));
     }
   }
   last_stamp_ = stamp_ns;

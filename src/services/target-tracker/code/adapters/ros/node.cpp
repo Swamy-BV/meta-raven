@@ -141,12 +141,14 @@ void TrackingNode::Configure() {
     encoder_ = std::make_unique<VehicleEncoder>(reid_model_);
     config_.use_appearance = true;
   }
+  ConfigureGround();
   tracker_ = std::make_unique<Tracker>(config_);
   metadata_ready_ = metadata_topic_.empty();
   model_detection_ = metadata_ready_;
 }
 
 void TrackingNode::Connect() {
+  ConnectGround();
   if (encoder_) {
     images_ = create_subscription<sensor_msgs::msg::Image>(
         image_topic_, rclcpp::SensorDataQoS().keep_last(1),
@@ -253,10 +255,11 @@ void TrackingNode::Receive(const vision_msgs::msg::Detection2DArray& message) {
       throw std::invalid_argument("duplicate or out-of-order detection");
     }
     auto observations = Observations(message);
-    Encode(observations, message.header);
     if (!frame_id_.empty() && frame_id_ != message.header.frame_id) {
       Reset("Camera optical frame changed");
     }
+    Encode(observations, message.header);
+    Locate(observations, message.header);
     const auto result = tracker_->Update(observations, stamp);
     frame_id_ = message.header.frame_id;
     last_stamp_ = stamp;
@@ -289,6 +292,9 @@ void TrackingNode::Publish(const std::vector<Track>& tracks,
 
 void TrackingNode::Reset(const std::string& reason) {
   tracker_->Reset();
+  if (ground_) {
+    ground_->Reset();
+  }
   if (last_stamp_) {
     // Same acquisition header clears cached tracks; it is not a new
     // observation.
@@ -345,6 +351,9 @@ void TrackingNode::PublishHealth() {
            {"retained_tracks", std::to_string(tracker_->RetainedCount())},
            {"model_identity", model_key_},
            {"vehicle_reid_model", reid_model_},
+           {"ground_association", ground_ ? "pose-aligned" : "disabled"},
+           {"ground_observations", std::to_string(ground_observations_)},
+           {"missing_ground_pose", std::to_string(missing_ground_)},
            {"appearance_recoveries",
             std::to_string(tracker_->AppearanceHealth().recoveries)},
            {"appearance_rejections",
