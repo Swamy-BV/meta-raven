@@ -7,6 +7,10 @@ The current platform is NXP FRDM-IMX95: Linux runs on the Cortex-A55 cores and
 PX4/NuttX runs on the Cortex-M7. Hardware and inference backends are separated
 from application logic to support future platforms.
 
+Start with [raven-manifest](https://github.com/Swamy-BV/raven-manifest/tree/develop)
+to fetch the platform sources and set up the Yocto build. This repository
+contains the Raven layer, services and board integration.
+
 ## Project highlights
 
 - **Integrated platform:** Yocto builds Linux, M7 PX4/NuttX firmware and the
