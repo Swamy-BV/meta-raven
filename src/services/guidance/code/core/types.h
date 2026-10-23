@@ -30,6 +30,8 @@ struct Pixel {
 
 inline constexpr double kDefaultDistance = 8;
 inline constexpr double kDefaultGain = 0.4;
+inline constexpr double kDefaultCrossTrackGain = 0.25;
+inline constexpr double kDefaultCrossTrackSpeed = 1.5;
 inline constexpr double kDefaultSpeed = 1.5;
 inline constexpr double kDefaultAcceleration = 0.6;
 inline constexpr double kDefaultYawRate = 0.4;
@@ -41,6 +43,10 @@ inline constexpr double kDefaultMaximumHeight = 12;
 struct Configuration {
   double distance = kDefaultDistance;
   double gain = kDefaultGain;
+  // Path-normal position correction: inverse seconds and metres per second.
+  // The speed bound applies to correction, not the path turning feed-forward.
+  double cross_track_gain = kDefaultCrossTrackGain;
+  double max_cross_track_speed = kDefaultCrossTrackSpeed;
   double max_speed = kDefaultSpeed;
   double max_acceleration = kDefaultAcceleration;
   double max_yaw_rate = kDefaultYawRate;

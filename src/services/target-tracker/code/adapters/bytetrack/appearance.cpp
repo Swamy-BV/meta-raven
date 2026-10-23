@@ -87,6 +87,7 @@ AssociationHooks AppearanceAssociation::Bind(
     const std::vector<Observation>& observations,
     const std::vector<std::size_t>& indices, double stamp) {
   measurements_.clear();
+  deferred_.clear();
   observations_ = &observations;
   stamp_ = stamp;
   indices_ = &indices;
@@ -124,8 +125,7 @@ float AppearanceAssociation::CandidateDistance(
     return kRejected;
   }
   const auto appearance = Distance(found->second, observation.appearance);
-  const bool grounded = ground_motion_ && observation.ground_point &&
-                        found->second.ground.Initialized();
+  const auto grounded = Grounded(found->second, observation);
   if ((ground_motion_ && track.state == TrackState::Lost) || grounded) {
     const auto motion = observation.ground_point
                             ? found->second.ground.Distance(
@@ -171,22 +171,38 @@ bool AppearanceAssociation::RecoveryAllows(const STrack& track, const Box& box,
          Overlap(found->second.observed_box, box) >= kMinimumRecoveryOverlap;
 }
 
+bool AppearanceAssociation::Grounded(const Gallery& gallery,
+                                     const Observation& observation) const {
+  return ground_motion_ && observation.ground_point &&
+         gallery.ground.Initialized();
+}
+
+float AppearanceAssociation::AssociationCost(const STrack& track,
+                                             const Candidate& candidate) {
+  const auto& measured = Measurement(candidate.input_index);
+  const auto cost = CandidateDistance(track, measured);
+  const auto shape_allowed =
+      RecoveryAllows(track, measured.box, candidate.iou_distance);
+  // A plausible retained identity gets a chance at a fuller observation before
+  // this candidate may create a competing track. Association gates stay strict.
+  if (track.state == TrackState::Lost && cost <= kMaximumDistance &&
+      !shape_allowed) {
+    deferred_.insert(candidate.input_index);
+  }
+  return shape_allowed ? cost : kRejected;
+}
+
 AppearanceAssociation::Costs AppearanceAssociation::BuildCosts(
     const std::vector<STrack*>& tracks, const std::vector<std::size_t>& indices,
-    const Costs& proximity) const {
+    const Costs& proximity) {
   Costs result;
   result.reserve(tracks.size());
   for (const auto* track : tracks) {
     std::vector<float> row;
     row.reserve(indices.size());
     for (const auto index : indices) {
-      const auto& measured = Measurement(index);
-      // Appearance cannot pull a lost identity onto a neighbouring lookalike
-      // while the original vehicle remains occluded.
-      const auto proximity_cost = proximity[result.size()][row.size()];
-      row.push_back(RecoveryAllows(*track, measured.box, proximity_cost)
-                        ? CandidateDistance(*track, measured)
-                        : kRejected);
+      row.push_back(AssociationCost(
+          *track, {index, proximity[result.size()][row.size()]}));
     }
     result.push_back(std::move(row));
   }
@@ -207,10 +223,14 @@ void AppearanceAssociation::ApplyRow(const std::vector<std::size_t>& indices,
       continue;
     }
     const auto distance = appearance[row][column];
-    const bool grounded = ground_motion_ && measured.ground_point &&
-                          galleries_.at(track.track_id).ground.Initialized();
-    if (distance > kMaximumDistance ||
-        ((recovering || grounded) && !Unique(appearance, row, column))) {
+    const auto grounded = Grounded(galleries_.at(track.track_id), measured);
+    const auto ambiguous = distance <= kMaximumDistance &&
+                           (recovering || grounded) &&
+                           !Unique(appearance, row, column);
+    if (recovering && ambiguous) {
+      deferred_.insert(indices[column]);
+    }
+    if (distance > kMaximumDistance || ambiguous) {
       costs[column] = kRejected;
       ++rejections_;
     } else if (recovering || grounded) {
@@ -270,6 +290,16 @@ void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
     gallery.descriptors.pop_front();
   }
   gallery.updated = stamp_;
+}
+
+std::function<bool(std::size_t)> AppearanceAssociation::Initialization() {
+  return [this](const std::size_t index) {
+    if (deferred_.count(index) == 0) {
+      return true;
+    }
+    ++deferred_creations_;
+    return false;
+  };
 }
 
 std::function<void(STrack&, std::size_t)> AppearanceAssociation::Recovery()

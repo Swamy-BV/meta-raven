@@ -9,6 +9,7 @@
 #include <string>
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/service.hpp>
@@ -120,6 +121,7 @@ class GuidanceNode final : public rclcpp::Node {
       const vision_msgs::msg::Detection2D& detection,
       std::optional<double> center_height);
   void Tick();
+  [[nodiscard]] std::optional<MotionPrediction> FollowingMotion() const;
   void UpdateCommand(const Pose& pose);
   void UpdateFollowingState();
   void UpdateBraking(const Pose& pose);
@@ -131,6 +133,7 @@ class GuidanceNode final : public rclcpp::Node {
       std::uint64_t timestamp) const;
   void TraceFrame(std::int64_t source_stamp_ns) const;
   void PublishHealth();
+  void AddTargetHealth(diagnostic_msgs::msg::DiagnosticStatus& health) const;
   void PublishObservationHealth(const std::string& rejection) const;
 
   Configuration config_;
@@ -165,6 +168,7 @@ class GuidanceNode final : public rclcpp::Node {
   std::string selected_id_, selected_frame_, selected_class_, model_key_;
   std::string state_ = "idle";
   std::string reason_ = "Select a visible person or car";
+  PredictionLimits prediction_limits_;
   double timeout_seconds_ = 0;
   double loss_timeout_seconds_ = 0;
   std::int64_t target_stamp_ns_ = 0;

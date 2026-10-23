@@ -33,6 +33,7 @@ struct Observation {
 struct AppearanceStatistics {
   std::size_t recoveries = 0;
   std::size_t rejections = 0;
+  std::size_t deferred = 0;
 };
 
 // Reject invalid geometry, class, score or non-unit descriptors before adapters

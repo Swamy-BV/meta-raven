@@ -146,11 +146,14 @@ void GuidanceNode::UpdateFollowingState() {
       std::chrono::duration<double>(Clock::now() - last_target_).count();
   if (age > loss_timeout_seconds_) {
     Hold("Selected identity expired; explicit selection and enable required");
-  } else if (age > timeout_seconds_ || !FreshTarget()) {
+  } else if (!FreshTracks() || !FollowingMotion()) {
     WaitForTarget();
   } else {
     state_ = "following";
-    reason_ = "Following the same selected identity";
+    reason_ =
+        FreshTarget()
+            ? "Following the same selected identity"
+            : "Predicting the same identity within age and uncertainty bounds";
   }
 }
 

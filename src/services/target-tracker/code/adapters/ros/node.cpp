@@ -354,6 +354,8 @@ void TrackingNode::PublishHealth() {
            {"ground_association", ground_ ? "pose-aligned" : "disabled"},
            {"ground_observations", std::to_string(ground_observations_)},
            {"missing_ground_pose", std::to_string(missing_ground_)},
+           {"deferred_new_identities",
+            std::to_string(tracker_->AppearanceHealth().deferred)},
            {"appearance_recoveries",
             std::to_string(tracker_->AppearanceHealth().recoveries)},
            {"appearance_rejections",

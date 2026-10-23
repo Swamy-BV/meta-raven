@@ -17,6 +17,8 @@ class TargetTrail {
                                                 double speed) const;
 
  private:
+  [[nodiscard]] std::optional<Vector> PointAt(double distance) const;
+
   std::deque<Motion> points_;
 };
 }  // namespace raven::guidance

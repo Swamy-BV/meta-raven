@@ -16,11 +16,18 @@
     target_acceleration_noise: 0.5
     follow_distance: 8.0
     position_gain: 0.4
+    # Path-normal correction only; path speed and turning feed-forward remain.
+    cross_track_gain: 0.25
+    max_cross_track_speed: 1.5
     max_speed: 0.6
     max_acceleration: 0.2
     max_yaw_rate: 0.2
     # Pause briefly; resume only the same ID. Expiration latches a hold.
     target_timeout: 0.35
+    # Default retains fresh-only control; simulation profiles may opt into
+    # covariance-bounded coasting without changing the latched loss timeout.
+    target_prediction_seconds: 0.35
+    target_prediction_stddev: 2.0
     target_loss_timeout: 1.5
     max_displacement: 30.0
     max_target_range: 40.0

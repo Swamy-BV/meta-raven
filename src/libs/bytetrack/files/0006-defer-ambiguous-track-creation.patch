@@ -1,0 +1,45 @@
+From: Raven developers
+Subject: [PATCH] Allow association policy to defer competing new identities
+
+Keep all existing overloads and track layouts unchanged. A synchronous optional
+creation predicate lets a caller defer a clipped or ambiguous observation near
+a retained identity without accepting it as a verified recovery.
+
+Upstream-Status: Pending
+Signed-off-by: Raven developers <noreply@raven.local>
+
+--- a/deploy/TensorRT/cpp/include/BYTETracker.h
++++ b/deploy/TensorRT/cpp/include/BYTETracker.h
+@@ -26,6 +26,7 @@
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step);
+ 	vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks);
+     vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover);
++    vector<STrack> update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover, const std::function<bool(size_t)>& initialize);
+     vector<int> retained_ids() const;
+ 	size_t size() const { return tracked_stracks.size() + lost_stracks.size(); }
+ 
+--- a/deploy/TensorRT/cpp/src/BYTETracker.cpp
++++ b/deploy/TensorRT/cpp/src/BYTETracker.cpp
+@@ -37,6 +37,11 @@
+ }
+ 
+ vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover)
++{
++    return update(objects, stamp_seconds, step, hooks, recover, {});
++}
++
++vector<STrack> BYTETracker::update(const vector<Object>& objects, double stamp_seconds, float step, const AssociationHooks& hooks, const std::function<void(STrack&, size_t)>& recover, const std::function<bool(size_t)>& initialize)
+ {
+ 
+ 	////////////////// Step 1: Get detections //////////////////
+@@ -232,6 +237,10 @@
+ 	for (int i = 0; i < u_detection.size(); i++)
+ 	{
+ 		STrack *track = &detections[u_detection[i]];
++        // An uncertain recovery candidate must not become a competing new ID.
++        // Empty policy preserves ordinary ByteTrack initialization.
++        if (initialize && !initialize(detection_ids[u_detection[i]]))
++            continue;
+ 		if (track->score < this->high_thresh)
+ 			continue;
+ 		// Reserve bounded storage for both visible and temporarily lost tracks.

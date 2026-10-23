@@ -50,6 +50,10 @@ void GuidanceNode::Configure() {
       number("motion_bearing_offset", config_.motion_bearing_offset);
   config_.distance = number("follow_distance", config_.distance);
   config_.gain = number("position_gain", config_.gain);
+  config_.cross_track_gain =
+      number("cross_track_gain", config_.cross_track_gain);
+  config_.max_cross_track_speed =
+      number("max_cross_track_speed", config_.max_cross_track_speed);
   config_.max_speed = number("max_speed", config_.max_speed);
   config_.max_acceleration =
       number("max_acceleration", config_.max_acceleration);
@@ -61,6 +65,10 @@ void GuidanceNode::Configure() {
   config_.maximum_height = number("maximum_height", config_.maximum_height);
   config_.max_range = number("max_target_range", config_.max_range);
   timeout_seconds_ = number("target_timeout", kDefaultTargetTimeout);
+  prediction_limits_.horizon_seconds =
+      number("target_prediction_seconds", timeout_seconds_);
+  prediction_limits_.position_stddev =
+      number("target_prediction_stddev", prediction_limits_.position_stddev);
   max_displacement_ = number("max_displacement", kDefaultMaxDisplacement);
   camera_.pitch = number("camera_pitch", camera_.pitch);
   camera_.stabilized =
@@ -81,10 +89,15 @@ void GuidanceNode::ValidateConfiguration() const {
       local_frame_ == local_ned_frame_ || config_.max_jerk <= 0 ||
       (!px4_namespace_.empty() && px4_namespace_.front() != '/') ||
       config_.distance <= 0 || config_.gain <= 0 || config_.max_speed <= 0 ||
-      config_.max_acceleration <= 0 || config_.max_yaw_rate <= 0 ||
-      config_.heading_response_seconds <= 0 ||
+      config_.cross_track_gain <= 0 || config_.max_cross_track_speed <= 0 ||
+      config_.minimum_heading_speed <= 0 || config_.max_acceleration <= 0 ||
+      config_.max_yaw_rate <= 0 || config_.heading_response_seconds <= 0 ||
       config_.max_range <= config_.distance || timeout_seconds_ <= 0 ||
       timeout_seconds_ > kTelemetryTimeout ||
+      prediction_limits_.horizon_seconds < timeout_seconds_ ||
+      prediction_limits_.horizon_seconds > kTargetMotionRetention ||
+      prediction_limits_.horizon_seconds >= loss_timeout_seconds_ ||
+      prediction_limits_.position_stddev <= 0 ||
       loss_timeout_seconds_ <= timeout_seconds_ ||
       loss_timeout_seconds_ > kMaximumLossTimeout || max_displacement_ <= 0 ||
       std::abs(camera_.pitch) > kMaximumPitch ||

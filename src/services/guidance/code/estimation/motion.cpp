@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 
@@ -11,7 +12,6 @@
 
 namespace raven::guidance {
 namespace {
-constexpr double kMaximumPrediction = 0.35;
 constexpr double kMinimumMotionSpan = 0.4;
 constexpr double kInnovationGate = 9.210340371976184;
 
@@ -117,8 +117,35 @@ void MotionEstimator::Correct(const Vector& point, const Motion& prediction,
 
 std::optional<Motion> MotionEstimator::Estimate(const double stamp,
                                                 const double max_speed) const {
+  const auto prediction =
+      Predict(stamp, max_speed,
+              {kTargetPredictionSeconds, std::numeric_limits<double>::max()});
+  return prediction ? std::optional<Motion>{prediction->motion} : std::nullopt;
+}
+
+std::optional<MotionPrediction> MotionEstimator::Predict(
+    const double stamp, const double max_speed,
+    const PredictionLimits& limits) const {
   if (!motion_ || !std::isfinite(stamp) || !std::isfinite(max_speed) ||
-      max_speed <= 0 || stamp < stamp_ || stamp - stamp_ > kMaximumPrediction) {
+      max_speed <= 0 || !std::isfinite(limits.horizon_seconds) ||
+      limits.horizon_seconds <= 0 ||
+      limits.horizon_seconds > retention_seconds_ ||
+      !std::isfinite(limits.position_stddev) || limits.position_stddev <= 0 ||
+      stamp < stamp_ || stamp - stamp_ > limits.horizon_seconds) {
+    return std::nullopt;
+  }
+  const auto age = stamp - stamp_;
+  // Do not coast on a newly initialized target's zero-velocity placeholder.
+  if (age > kTargetPredictionSeconds &&
+      stamp_ - first_stamp_ < kMinimumMotionSpan) {
+    return std::nullopt;
+  }
+  const auto variance = PredictCovariance(age).position;
+  if (!std::isfinite(variance) || variance < 0) {
+    return std::nullopt;
+  }
+  const auto deviation = std::sqrt(variance);
+  if (deviation > limits.position_stddev) {
     return std::nullopt;
   }
   auto result = *motion_;
@@ -130,6 +157,6 @@ std::optional<Motion> MotionEstimator::Estimate(const double stamp,
                                 : 0;
     result.position[axis] += result.velocity[axis] * (stamp - stamp_);
   }
-  return result;
+  return MotionPrediction{result, age, deviation};
 }
 }  // namespace raven::guidance

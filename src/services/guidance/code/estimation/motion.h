@@ -10,6 +10,19 @@ inline constexpr double kTargetPositionStddev = 0.35;
 inline constexpr double kTargetAccelerationNoise = 0.5;
 inline constexpr double kTargetMotionRetention = 1.5;
 
+inline constexpr double kTargetPredictionSeconds = 0.35;
+
+struct PredictionLimits {
+  double horizon_seconds = kTargetPredictionSeconds;
+  double position_stddev = 2;  // Maximum predicted per-axis deviation, metres.
+};
+
+struct MotionPrediction {
+  Motion motion;
+  double age_seconds = 0;
+  double position_stddev = 0;
+};
+
 struct MotionInnovation {
   Vector residual{};      // North/east measurement minus prediction, metres.
   double stamp = 0;       // Measurement time, seconds in the observation clock.
@@ -32,6 +45,11 @@ class MotionEstimator {
   [[nodiscard]] const std::optional<MotionInnovation>& LastInnovation() const;
   [[nodiscard]] std::optional<Motion> Estimate(double stamp,
                                                double max_speed) const;
+
+  // Opt-in coasting never changes the last accepted measurement timestamp.
+  // Both age and predicted covariance must remain inside the supplied bounds.
+  [[nodiscard]] std::optional<MotionPrediction> Predict(
+      double stamp, double max_speed, const PredictionLimits& limits) const;
 
  private:
   struct Covariance {

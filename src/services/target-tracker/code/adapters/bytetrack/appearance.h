@@ -8,6 +8,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 #include "core/ground_motion.h"
@@ -24,9 +25,12 @@ class AppearanceAssociation final {
   AssociationHooks Bind(const std::vector<Observation>& observations,
                         const std::vector<std::size_t>& indices, double stamp);
   [[nodiscard]] std::function<void(STrack&, std::size_t)> Recovery() const;
+  [[nodiscard]] std::function<bool(std::size_t)> Initialization();
   void Prune(const std::vector<int>& retained);
   // Current update only; no predicted or stale box is returned.
   [[nodiscard]] std::optional<Box> MeasuredBox(int identity) const;
+
+  [[nodiscard]] std::size_t Deferred() const { return deferred_creations_; }
 
   [[nodiscard]] std::size_t Recoveries() const { return recoveries_; }
 
@@ -42,6 +46,16 @@ class AppearanceAssociation final {
   };
 
   using Costs = std::vector<std::vector<float>>;
+  [[nodiscard]] bool Grounded(const Gallery& gallery,
+                              const Observation& observation) const;
+
+  struct Candidate {
+    std::size_t input_index = 0;
+    float iou_distance = 0;
+  };
+
+  [[nodiscard]] float AssociationCost(const STrack& track,
+                                      const Candidate& candidate);
   [[nodiscard]] const Observation& Measurement(std::size_t index) const;
   void Refine(Costs& costs, const std::vector<STrack*>& tracks,
               const std::vector<std::size_t>& indices);
@@ -49,7 +63,7 @@ class AppearanceAssociation final {
   void Recover(STrack& track, std::size_t index) const;
   [[nodiscard]] Costs BuildCosts(const std::vector<STrack*>& tracks,
                                  const std::vector<std::size_t>& indices,
-                                 const Costs& proximity) const;
+                                 const Costs& proximity);
   [[nodiscard]] float CandidateDistance(const STrack& track,
                                         const Observation& observation) const;
   [[nodiscard]] bool RecoveryAllows(const STrack& track, const Box& box,
@@ -59,6 +73,9 @@ class AppearanceAssociation final {
                 std::vector<float>& costs);
   [[nodiscard]] float Distance(const Gallery& gallery,
                                const std::vector<float>& descriptor) const;
+  // Input indices deferred for this update only; no synthetic observation.
+  std::set<std::size_t> deferred_;
+  std::size_t deferred_creations_ = 0;
   std::map<int, Gallery> galleries_;
   std::map<int, Box> measurements_;
   const std::vector<Observation>* observations_ = nullptr;

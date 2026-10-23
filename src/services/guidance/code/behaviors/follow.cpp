@@ -57,6 +57,34 @@ Motion FormationReference(const FollowInput& input, const Configuration& config,
            input.target_velocity[1] - north * rate, 0}};
 }
 
+Vector ReferenceVelocity(const Motion& reference, const Vector& error,
+                         const Configuration& config) {
+  const auto speed = std::hypot(reference.velocity[0], reference.velocity[1]);
+  if (!config.follow_path || speed < config.minimum_heading_speed) {
+    // At rest there is no reliable path tangent. Retain position convergence
+    // without deriving a direction from nearly zero velocity.
+    return LimitVelocity({reference.velocity[0] + config.gain * error[0],
+                          reference.velocity[1] + config.gain * error[1], 0},
+                         config.max_speed);
+  }
+  const auto north = reference.velocity[0] / speed;
+  const auto east = reference.velocity[1] / speed;
+  const auto along_error = error[0] * north + error[1] * east;
+  const auto cross_error = -error[0] * east + error[1] * north;
+  const auto cross_limit =
+      std::min(config.max_cross_track_speed, config.max_speed);
+  const auto cross_speed = std::clamp(config.cross_track_gain * cross_error,
+                                      -cross_limit, cross_limit);
+  // Reserve the lateral correction before allocating catch-up speed. Scaling
+  // the whole vector at the speed limit would weaken lateral convergence.
+  const auto along_limit = std::sqrt(std::max(
+      0.0, config.max_speed * config.max_speed - cross_speed * cross_speed));
+  const auto along_speed =
+      std::clamp(speed + config.gain * along_error, -along_limit, along_limit);
+  return {along_speed * north - cross_speed * east,
+          along_speed * east + cross_speed * north, 0};
+}
+
 Vector GovernSeparation(const Vector& desired, const FollowInput& input,
                         const Configuration& config) {
   const auto north = input.target[0] - input.pose.position[0];
@@ -165,10 +193,7 @@ Command Follow(const FollowInput& input, const Configuration& config) {
   const Vector error_position{reference.position[0] - input.pose.position[0],
                               reference.position[1] - input.pose.position[1],
                               0};
-  auto desired = LimitVelocity(
-      {reference.velocity[0] + config.gain * error_position[0],
-       reference.velocity[1] + config.gain * error_position[1], 0},
-      config.max_speed);
+  auto desired = ReferenceVelocity(reference, error_position, config);
   if (config.follow_path) {
     desired = GovernSeparation(desired, input, config);
   }

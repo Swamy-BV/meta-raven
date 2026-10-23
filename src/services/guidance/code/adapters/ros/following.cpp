@@ -149,25 +149,33 @@ bool GuidanceNode::StartFollowing() {
   return true;
 }
 
+std::optional<MotionPrediction> GuidanceNode::FollowingMotion() const {
+  return motion_.Predict(now().seconds(), config_.max_speed,
+                         prediction_limits_);
+}
+
 void GuidanceNode::UpdateCommand(const Pose& pose) {
-  const auto stamp = now().nanoseconds();
   const auto dt = control_step_;
   if (!enabled_ || state_ != "following" || !target_ || dt <= 0) {
     return;
   }
-  const auto motion = motion_.Estimate(
-      static_cast<double>(stamp) / kNanoseconds, config_.max_speed);
-  if (!motion) {
+  const auto prediction = FollowingMotion();
+  if (!prediction) {
     WaitForTarget();
     return;
   }
   ResumeVelocity();
+  const auto& motion = prediction->motion;
+  const auto speed = std::hypot(motion.velocity[0], motion.velocity[1]);
+  // Consume recorded trail during a bounded visual gap. Fresh-frame behavior
+  // is unchanged; never append predicted points as camera measurements.
+  const auto advance =
+      speed * std::max(0.0, prediction->age_seconds - timeout_seconds_);
   command_ = Follow(
-      {pose, motion->position, motion->velocity, command_.velocity,
-       command_.yaw, dt, command_.bearing,
+      {pose, motion.position, motion.velocity, command_.velocity, command_.yaw,
+       dt, command_.bearing,
        config_.follow_path
-           ? trail_.Reference(config_.distance, std::hypot(motion->velocity[0],
-                                                           motion->velocity[1]))
+           ? trail_.Reference(std::max(0.0, config_.distance - advance), speed)
            : std::nullopt},
       config_);
   const auto planning_start = Clock::now();

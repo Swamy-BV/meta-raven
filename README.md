@@ -46,20 +46,21 @@ vision and Linux guidance with actual M7 PX4 controlling an AirSim aircraft.
 
 ## Current progress
 
-Validation snapshot: **22 October 2026**. These are simulation and hardware
+Validation snapshot: **23 October 2026**. These are simulation and hardware
 bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
-| Bridge recovery | Individual bridge tests passed; the latest five-bridge run recovered the intended car after every bridge | Five-bridge active following was **84%**, below the **90%** requirement; sustained following did not pass |
+| Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | Target-loss handling | Hold, landing and disarm exercised in the simulation test harness | Qualify recovery transitions and independent safety supervision |
 | GPS-denied navigation | OpenVINS runs on i.MX95 with AirSim camera + IMU; two 42 m shadow tests measured 0.83 / 1.26 m position RMSE and 0.87 / 1.23 m final drift | Improve initialization/climb error and qualify more motion cases before external-odometry fusion on M7 |
 
-The five-bridge run completed its 61-second tracking window, but visual gaps
-caused braking and catch-up. Identity checks used simulator references only for
-evaluation, never as guidance inputs. General ReID accuracy and multi-run
-reliability remain unqualified.
+The five-bridge run passed the original 90% sustained-following requirement.
+Active following includes fresh observations and prediction bounded by age and
+uncertainty; visual reacquisition took up to 1.93 seconds. The three-second
+target-loss hold remains unchanged. Simulator identity checks are evaluation
+references only. General ReID accuracy and multi-run reliability remain open.
 
 ## Components
 
@@ -99,8 +100,8 @@ obstacle mapping are not yet implemented.
    pilot; VIO has no flight-control authority. Then validate
    external-odometry fusion on M7 PX4 with GPS aiding disabled: hover, square
    flight, return and landing. Ground truth remains an evaluation reference.
-2. **Continuous following:** expose target-state uncertainty and add deliberate
-   occlusion/reacquisition behavior with smooth recovery and bounded prediction.
+2. **Continuous following:** repeat the bounded-prediction and reacquisition
+   tests across more speeds, appearances and occlusion lengths.
 3. **Obstacle-aware autonomy:** add depth-based local mapping and safe trajectory
    planning, then validate localization loss, sensor delays and fallback behavior.
 

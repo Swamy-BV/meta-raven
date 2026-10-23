@@ -305,7 +305,7 @@ std::vector<Track> Tracker::Impl::Update(
                   observations, group.indices,
                   static_cast<double>(stamp_ns) / kNanosPerSecond)
             : AssociationHooks{},
-        state.appearance.Recovery());
+        state.appearance.Recovery(), state.appearance.Initialization());
     state.appearance.Prune(state.tracker->retained_ids());
     for (const auto& track : tracks) {
       result.push_back(Output(track, label, state.number,
@@ -320,6 +320,7 @@ std::vector<Track> Tracker::Impl::Update(
 void Tracker::Impl::Prune() {
   for (auto entry = classes_.begin(); entry != classes_.end();) {
     if (entry->second.tracker->size() == 0) {
+      retired_.deferred += entry->second.appearance.Deferred();
       retired_.recoveries += entry->second.appearance.Recoveries();
       retired_.rejections += entry->second.appearance.Rejections();
       entry = classes_.erase(entry);
@@ -352,6 +353,7 @@ std::size_t Tracker::Impl::RetainedCount() const {
 AppearanceStatistics Tracker::Impl::AppearanceHealth() const {
   AppearanceStatistics result = retired_;
   for (const auto& [label, state] : classes_) {
+    result.deferred += state.appearance.Deferred();
     result.recoveries += state.appearance.Recoveries();
     result.rejections += state.appearance.Rejections();
   }
