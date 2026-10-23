@@ -11,6 +11,13 @@ Start with [raven-manifest](https://github.com/Swamy-BV/raven-manifest/tree/deve
 to fetch the platform sources and set up the Yocto build. This repository
 contains the Raven layer, services and board integration.
 
+## Demo
+
+[![Six-car tracking on NXP i.MX95](https://raw.githubusercontent.com/Swamy-BV/raven-demos/main/images/six-car-tracking.png)](https://github.com/Swamy-BV/raven-demos)
+
+[Explore the demo gallery](https://github.com/Swamy-BV/raven-demos): i.MX95 NPU
+vision and Linux guidance with actual M7 PX4 controlling an AirSim aircraft.
+
 ## Project highlights
 
 - **Integrated platform:** Yocto builds Linux, M7 PX4/NuttX firmware and the
