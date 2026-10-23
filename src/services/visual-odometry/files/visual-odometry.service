@@ -1,0 +1,45 @@
+[Unit]
+Description=Visual-inertial odometry (explicit shadow-mode evaluation)
+ConditionPathExists=/var/lib/visual-odometry/estimator_config.yaml
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=visual-odometry
+LogsDirectory=visual-odometry
+Environment=ROS_LOG_DIR=/var/log/visual-odometry
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+Environment=OMP_NUM_THREADS=2
+Environment=OPENBLAS_NUM_THREADS=1
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=@ROS_PREFIX@/lib/ov_msckf/run_subscribe_msckf \
+    --ros-args --params-file /etc/visual-odometry/ros.yaml \
+    --remap __node:=visual_odometry \
+    --remap __ns:=/localization/vio \
+    --remap odomimu:=odometry \
+    --remap /cam0/image_raw:=/navigation/camera/image_raw \
+    --remap /imu0:=/navigation/imu
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=1G
+TasksMax=64
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

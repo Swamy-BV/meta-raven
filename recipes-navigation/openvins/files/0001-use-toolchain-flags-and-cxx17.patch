@@ -1,0 +1,176 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Use toolchain flags and C++17 and honor test options
+
+Use the toolchain optimization and hardening flags, require C++17 for ROS 2
+Jazzy and Ceres, and honor BUILD_TESTING for upstream test executables.
+Boost.System has been header-only since 1.69; its stub library was removed
+in 1.89, so do not request a compiled system component.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+diff --git a/ov_core/CMakeLists.txt b/ov_core/CMakeLists.txt
+index ecc1cc8..ca674b0 100644
+--- a/ov_core/CMakeLists.txt
++++ b/ov_core/CMakeLists.txt
+@@ -8,7 +8,7 @@ find_package(OpenCV 3 QUIET)
+ if (NOT OpenCV_FOUND)
+     find_package(OpenCV 4 REQUIRED)
+ endif ()
+-find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time)
++find_package(Boost REQUIRED COMPONENTS filesystem thread date_time)
+ message(STATUS "OPENCV: " ${OpenCV_VERSION} " | BOOST: " ${Boost_VERSION})
+ 
+ # By default we build with ROS, but you can disable this and just build as a library
+@@ -37,17 +37,12 @@ if (PYTHONLIBS_FOUND AND NOT DISABLE_MATPLOTLIB)
+     list(APPEND thirdparty_libraries ${PYTHON_LIBRARIES})
+ endif ()
+ 
+-# We need c++14 for ROS2, thus just require it for everybody
+-# NOTE: To future self, hope this isn't an issue...
+-set(CMAKE_CXX_STANDARD 14)
++# ROS 2 Jazzy and Ceres require C++17.
++set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+-# Enable compile optimizations
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
+-
+-# Enable debug flags (use if you want to debug in gdb)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -Wall -Wuninitialized -Wmaybe-uninitialized -fno-omit-frame-pointer")
++# Optimization, debug information and hardening come from the toolchain.
+ 
+ # Find our ROS version!
+ # NOTE: Default to using the ROS1 package if both are in our enviroment
+diff --git a/ov_core/cmake/ROS2.cmake b/ov_core/cmake/ROS2.cmake
+index b4ed9b7..5993620 100644
+--- a/ov_core/cmake/ROS2.cmake
++++ b/ov_core/cmake/ROS2.cmake
+@@ -72,6 +72,7 @@ ament_export_libraries(ov_core_lib)
+ #    target_link_libraries(test_tracking ov_core_lib ${thirdparty_libraries})
+ #endif ()
+ 
++if (BUILD_TESTING)
+ add_executable(test_webcam src/test_webcam.cpp)
+ ament_target_dependencies(test_webcam rclcpp cv_bridge)
+ target_link_libraries(test_webcam ov_core_lib ${thirdparty_libraries})
+@@ -82,5 +83,7 @@ ament_target_dependencies(test_profile rclcpp cv_bridge)
+ target_link_libraries(test_profile ov_core_lib ${thirdparty_libraries})
+ install(TARGETS test_profile DESTINATION lib/${PROJECT_NAME})
+ 
++endif ()
++
+ # finally define this as the package
+ ament_package()
+\ No newline at end of file
+diff --git a/ov_init/CMakeLists.txt b/ov_init/CMakeLists.txt
+index 0e7c58a..46aab0e 100644
+--- a/ov_init/CMakeLists.txt
++++ b/ov_init/CMakeLists.txt
+@@ -9,7 +9,7 @@ find_package(OpenCV 3 QUIET)
+ if (NOT OpenCV_FOUND)
+     find_package(OpenCV 4 REQUIRED)
+ endif ()
+-find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time)
++find_package(Boost REQUIRED COMPONENTS filesystem thread date_time)
+ find_package(Ceres REQUIRED)
+ message(STATUS "OPENCV: " ${OpenCV_VERSION} " | BOOST: " ${Boost_VERSION} " | CERES: " ${Ceres_VERSION})
+ 
+@@ -30,17 +30,12 @@ if (PYTHONLIBS_FOUND AND NOT DISABLE_MATPLOTLIB)
+     list(APPEND thirdparty_libraries ${PYTHON_LIBRARIES})
+ endif ()
+ 
+-# We need c++14 for ROS2, thus just require it for everybody
+-# NOTE: To future self, hope this isn't an issue...
+-set(CMAKE_CXX_STANDARD 14)
++# ROS 2 Jazzy and Ceres require C++17.
++set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+-# Enable compile optimizations
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
+-
+-# Enable debug flags (use if you want to debug in gdb)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -Wall -Wuninitialized -Wmaybe-uninitialized")
++# Optimization, debug information and hardening come from the toolchain.
+ 
+ # Find our ROS version!
+ # NOTE: Default to using the ROS1 package if both are in our enviroment
+diff --git a/ov_init/cmake/ROS2.cmake b/ov_init/cmake/ROS2.cmake
+index 0d1634f..fd783c1 100644
+--- a/ov_init/cmake/ROS2.cmake
++++ b/ov_init/cmake/ROS2.cmake
+@@ -64,6 +64,7 @@ ament_export_libraries(ov_init_lib)
+ # Make binary files!
+ ##################################################
+ 
++if (BUILD_TESTING)
+ add_executable(test_simulation src/test_simulation.cpp)
+ ament_target_dependencies(test_simulation ${ament_libraries})
+ target_link_libraries(test_simulation ov_init_lib ${thirdparty_libraries})
+@@ -79,6 +80,8 @@ ament_target_dependencies(test_dynamic_init ${ament_libraries})
+ target_link_libraries(test_dynamic_init ov_init_lib ${thirdparty_libraries})
+ install(TARGETS test_dynamic_init DESTINATION lib/${PROJECT_NAME})
+ 
++endif ()
++
+ # Install launch and config directories
+ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
+ 
+diff --git a/ov_msckf/CMakeLists.txt b/ov_msckf/CMakeLists.txt
+index 5f8a2eb..b0b4c83 100644
+--- a/ov_msckf/CMakeLists.txt
++++ b/ov_msckf/CMakeLists.txt
+@@ -8,7 +8,7 @@ find_package(OpenCV 3 QUIET)
+ if (NOT OpenCV_FOUND)
+     find_package(OpenCV 4 REQUIRED)
+ endif ()
+-find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time)
++find_package(Boost REQUIRED COMPONENTS filesystem thread date_time)
+ find_package(Ceres REQUIRED)
+ message(STATUS "OPENCV: " ${OpenCV_VERSION} " | BOOST: " ${Boost_VERSION} " | CERES: " ${Ceres_VERSION})
+ 
+@@ -24,17 +24,12 @@ else ()
+     add_definitions(-DENABLE_ARUCO_TAGS=1)
+ endif ()
+ 
+-# We need c++14 for ROS2, thus just require it for everybody
+-# NOTE: To future self, hope this isn't an issue...
+-set(CMAKE_CXX_STANDARD 14)
++# ROS 2 Jazzy and Ceres require C++17.
++set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+ 
+-# Enable compile optimizations
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
+-
+-# Enable debug flags (use if you want to debug in gdb)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -Wall -Wuninitialized -fno-omit-frame-pointer")
++# Optimization, debug information and hardening come from the toolchain.
+ 
+ # Find our ROS version!
+ # NOTE: Default to using the ROS1 package if both are in our enviroment
+diff --git a/ov_msckf/cmake/ROS2.cmake b/ov_msckf/cmake/ROS2.cmake
+index eacffbb..dd2eef3 100644
+--- a/ov_msckf/cmake/ROS2.cmake
++++ b/ov_msckf/cmake/ROS2.cmake
+@@ -98,6 +98,7 @@ ament_target_dependencies(run_simulation ${ament_libraries})
+ target_link_libraries(run_simulation ov_msckf_lib ${thirdparty_libraries})
+ install(TARGETS run_simulation DESTINATION lib/${PROJECT_NAME})
+ 
++if (BUILD_TESTING)
+ add_executable(test_sim_meas src/test_sim_meas.cpp)
+ ament_target_dependencies(test_sim_meas ${ament_libraries})
+ target_link_libraries(test_sim_meas ov_msckf_lib ${thirdparty_libraries})
+@@ -108,6 +109,8 @@ ament_target_dependencies(test_sim_repeat ${ament_libraries})
+ target_link_libraries(test_sim_repeat ov_msckf_lib ${thirdparty_libraries})
+ install(TARGETS test_sim_repeat DESTINATION lib/${PROJECT_NAME})
+ 
++endif ()
++
+ # Install launch and config directories
+ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
+ install(DIRECTORY ../config/ DESTINATION share/${PROJECT_NAME}/config/)

@@ -1,0 +1,56 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Bound ROS executor concurrency and retain IMU history
+
+The default executor creates one worker per core. Bound its concurrency for
+embedded deployments and make the IMU queue deep enough to absorb scheduling
+jitter without losing the measurements needed for inertial integration.
+Both settings remain configurable ROS parameters. Estimator equations and
+measurement timestamps are unchanged.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/run_subscribe_msckf.cpp
++++ b/ov_msckf/src/run_subscribe_msckf.cpp
+@@ -107,7 +107,14 @@
+   ros::waitForShutdown();
+ #elif ROS_AVAILABLE == 2
+   // rclcpp::spin(node);
+-  rclcpp::executors::MultiThreadedExecutor executor;
++  int64_t executor_threads = 2;
++  node->get_parameter_or("executor_threads", executor_threads, int64_t{2});
++  if (executor_threads < 1 || executor_threads > 64) {
++    RCLCPP_ERROR(node->get_logger(), "executor_threads must be in 1..64");
++    rclcpp::shutdown();
++    return EXIT_FAILURE;
++  }
++  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), static_cast<size_t>(executor_threads));
+   executor.add_node(node);
+   executor.spin();
+ #endif
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -21,6 +21,8 @@
+ 
+ #include "ROS2Visualizer.h"
+ 
++#include <stdexcept>
++
+ #include "core/VioManager.h"
+ #include "ros/ROSVisualizerHelper.h"
+ #include "sim/Simulator.h"
+@@ -170,7 +170,13 @@
+   _node->declare_parameter<std::string>("topic_imu", "/imu0");
+   _node->get_parameter("topic_imu", topic_imu);
+   parser->parse_external("relative_config_imu", "imu0", "rostopic", topic_imu);
+-  sub_imu = _node->create_subscription<sensor_msgs::msg::Imu>(topic_imu, rclcpp::SensorDataQoS(),
++  int64_t imu_queue_depth = 200;
++  _node->get_parameter_or("imu_queue_depth", imu_queue_depth, int64_t{200});
++  if (imu_queue_depth < 1 || imu_queue_depth > 10000) {
++    throw std::invalid_argument("imu_queue_depth must be in 1..10000");
++  }
++  sub_imu = _node->create_subscription<sensor_msgs::msg::Imu>(
++      topic_imu, rclcpp::SensorDataQoS().keep_last(static_cast<size_t>(imu_queue_depth)),
+                                                               std::bind(&ROS2Visualizer::callback_inertial, this, std::placeholders::_1));
+   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
+ 

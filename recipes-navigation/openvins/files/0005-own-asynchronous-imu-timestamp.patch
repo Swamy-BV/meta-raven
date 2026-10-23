@@ -1,0 +1,31 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Own the inertial timestamp used by the detached update worker
+
+callback_inertial creates ImuData on its stack, then launches a detached
+worker capturing it by reference. The callback can return before the worker
+reads message.timestamp. Capture the timestamp by value instead so the queue
+horizon cannot read an expired callback-local object.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -461,7 +461,7 @@
+   if (thread_update_running)
+     return;
+   thread_update_running = true;
+-  std::thread thread([&] {
++  std::thread thread([this, imu_timestamp = message.timestamp] {
+     // Lock on the queue (prevents new images from appending)
+     std::lock_guard<std::mutex> lck(camera_queue_mtx);
+ 
+@@ -479,7 +479,7 @@
+ 
+       // Loop through our queue and see if we are able to process any of our camera measurements
+       // We are able to process if we have at least one IMU measurement greater than the camera time
+-      double timestamp_imu_inC = message.timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
++      double timestamp_imu_inC = imu_timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
+       while (!camera_queue.empty() && camera_queue.at(0).timestamp < timestamp_imu_inC) {
+         auto rT0_1 = boost::posix_time::microsec_clock::local_time();
+         double update_dt = 100.0 * (timestamp_imu_inC - camera_queue.at(0).timestamp);

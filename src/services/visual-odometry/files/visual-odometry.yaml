@@ -1,0 +1,15 @@
+/**:
+  ros__parameters:
+    # Supply an estimator profile and its camera/IMU calibration before starting.
+    config_path: /var/lib/visual-odometry/estimator_config.yaml
+    # Keep evaluation output separate from aircraft transforms and PX4 inputs.
+    publish_global_to_imu_tf: false
+    publish_calibration_tf: false
+    save_total_state: false
+    max_cameras: 1
+    use_stereo: false
+    path_gt: ""
+    num_opencv_threads: 2
+    init_dyn_mle_max_threads: 2
+    executor_threads: 2
+    imu_queue_depth: 200

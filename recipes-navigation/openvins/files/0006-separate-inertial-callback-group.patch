@@ -1,0 +1,40 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Keep camera queue waits out of the inertial callback group
+
+The ROS 2 default mutually-exclusive callback group serializes image and IMU
+callbacks. The image callback can wait for the estimator worker's camera
+queue mutex while that worker needs newly received inertial history. Give
+the IMU subscription its own mutually-exclusive group so the bounded
+multi-threaded executor can continue feeding inertial samples during image
+processing. Camera callbacks stay serialized in the default group.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -177,9 +177,13 @@
+   if (imu_queue_depth < 1 || imu_queue_depth > 10000) {
+     throw std::invalid_argument("imu_queue_depth must be in 1..10000");
+   }
++  imu_callback_group = _node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
++  rclcpp::SubscriptionOptions imu_subscription_options;
++  imu_subscription_options.callback_group = imu_callback_group;
+   sub_imu = _node->create_subscription<sensor_msgs::msg::Imu>(
+       topic_imu, rclcpp::SensorDataQoS().keep_last(static_cast<size_t>(imu_queue_depth)),
+-                                                              std::bind(&ROS2Visualizer::callback_inertial, this, std::placeholders::_1));
++                                                              std::bind(&ROS2Visualizer::callback_inertial, this, std::placeholders::_1),
++      imu_subscription_options);
+   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
+ 
+   // Logic for sync stereo subscriber
+--- a/ov_msckf/src/ros/ROS2Visualizer.h
++++ b/ov_msckf/src/ros/ROS2Visualizer.h
+@@ -156,6 +156,7 @@
+   std::shared_ptr<tf2_ros::TransformBroadcaster> mTfBr;
+ 
+   // Our subscribers and camera synchronizers
++  rclcpp::CallbackGroup::SharedPtr imu_callback_group;
+   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu;
+   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subs_cam;
+   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_pol;
