@@ -116,6 +116,10 @@ bitbake raven-image-swu
 This target builds the Linux image, PX4 firmware and boot components required
 for the SWUpdate bundle.
 
+## Contact
+
+For collaboration and project enquiries, reach out to [Swamy BV on LinkedIn](https://www.linkedin.com/in/swamy-bv/).
+
 ## License
 
 Copyright (c) 2026 Swamy BV. Raven-owned code and layer metadata are licensed
