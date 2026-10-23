@@ -13,10 +13,11 @@ contains the Raven layer, services and board integration.
 
 ## Demo
 
-[![Six-car tracking on NXP i.MX95](https://raw.githubusercontent.com/Swamy-BV/raven-demos/main/images/six-car-tracking.png)](https://swamy-bv.github.io/raven-demos/)
+[![City vehicle tracking on NXP FRDM-IMX95](https://raw.githubusercontent.com/Swamy-BV/raven-demos/main/images/city-tracking.png)](https://swamy-bv.github.io/raven-demos/)
 
-[Watch the demo](https://swamy-bv.github.io/raven-demos/): i.MX95 NPU
-vision and Linux guidance with actual M7 PX4 controlling an AirSim aircraft.
+[Watch the city demo](https://swamy-bv.github.io/raven-demos/): selected-car
+following among 21 vehicles, intersections and roundabouts. i.MX95 NPU vision
+and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
 
 ## Project highlights
 
@@ -53,6 +54,7 @@ bring-up results, not physical flight qualification.
 | --- | --- | --- |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
+| City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
 | Target-loss handling | Hold, landing and disarm exercised in the simulation test harness | Qualify recovery transitions and independent safety supervision |
 | GPS-denied navigation | OpenVINS runs on i.MX95 with AirSim camera + IMU; two 42 m shadow tests measured 0.83 / 1.26 m position RMSE and 0.87 / 1.23 m final drift | Improve initialization/climb error and qualify more motion cases before external-odometry fusion on M7 |
 
