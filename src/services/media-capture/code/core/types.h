@@ -62,7 +62,6 @@ struct Settings {
                 "rgb8", kVideoBitrateKbps, kJpegQuality};
   std::string mode = "video";
   std::string converter = "software";
-  std::string encoder = "v4l2h264enc";
   std::string output_dir = "media";
   std::string stream_host = "127.0.0.1";
   int stream_port = kStreamPort;

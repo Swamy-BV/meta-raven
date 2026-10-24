@@ -82,15 +82,16 @@ void Validate(const Settings& settings) {
     ValidateProfile(*profile);
   }
   if (settings.photo.codec != "jpeg" || settings.image.codec != "rgb8" ||
-      settings.preview.codec != "h264" || settings.video.codec != "h264") {
+      (settings.preview.codec != "h264" && settings.preview.codec != "h265") ||
+      (settings.video.codec != "h264" && settings.video.codec != "h265")) {
     throw std::invalid_argument(
-        "supported profiles are JPEG photos, RGB8 ROS and H.264 video");
+        "supported profiles are JPEG photos, RGB8 ROS and H.264/H.265 video");
   }
   if ((settings.mode != "photo" && settings.mode != "video") ||
       (settings.converter != "g2d" && settings.converter != "software") ||
-      settings.encoder != "v4l2h264enc" || settings.output_dir.empty() ||
-      settings.stream_port < kMinPort || settings.stream_port > kMaxPort ||
-      settings.max_photos < 1 || settings.max_photos > kMaximumPhotoCount ||
+      settings.output_dir.empty() || settings.stream_port < kMinPort ||
+      settings.stream_port > kMaxPort || settings.max_photos < 1 ||
+      settings.max_photos > kMaximumPhotoCount ||
       settings.segment_seconds < 2 ||
       settings.segment_seconds > kMaxSegmentSeconds) {
     throw std::invalid_argument("invalid capture configuration");

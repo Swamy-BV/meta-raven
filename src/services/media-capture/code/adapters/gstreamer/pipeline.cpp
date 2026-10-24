@@ -111,20 +111,25 @@ std::string VideoGraph(const Settings& settings,
     return {};
   }
   const auto& profile = settings.recording ? settings.video : settings.preview;
+  const auto& codec = profile.codec;
+  const std::string encoded_caps = "video/x-" + codec;
+  const std::string codec_profile = codec == "h265" ? "main" : "baseline";
   auto graph =
       " source." + Queue() +
       "videorate drop-only=true ! video/x-raw(ANY),framerate=" +
       std::to_string(profile.fps) + "/1 ! " +
-      Convert(settings, profile, "NV12") + " ! " + settings.encoder +
+      Convert(settings, profile, "NV12") + " ! v4l2" + codec + "enc" +
       " extra-controls=" +
       Quote("encode,video_bitrate=" +
             std::to_string(profile.bitrate_kbps * kBitsPerKbit)) +
-      " ! video/x-h264,profile=baseline ! h264parse ! "
-      "video/x-h264,alignment=au ! tee name=encoded "
+      " ! " + encoded_caps + ",profile=" + codec_profile + " ! " + codec +
+      "parse ! " + encoded_caps +
+      ",alignment=au ! tee name=encoded "
       "encoded. ! queue max-size-buffers=4 max-size-bytes=0 max-size-time=0 "
       "! " +
       "valve name=stream_gate drop=" + (settings.streaming ? "false" : "true") +
-      " drop-mode=transform-to-gap ! rtph264pay config-interval=1 pt=96 ! "
+      " drop-mode=transform-to-gap ! rtp" + codec +
+      "pay config-interval=1 pt=96 ! "
       "udpsink sync=false async=false host=" +
       Quote(settings.stream_host) +
       " port=" + std::to_string(settings.stream_port);

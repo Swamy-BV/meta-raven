@@ -458,7 +458,8 @@ void MediaCaptureNode::PublishCapabilities() {
                      "file", "ros",       "rtp"};
   message.modes = {"photo", "video"};
   const auto& config = session_->Configuration();
-  message.hardware_encoding = config.encoder == "v4l2h264enc";
+  // Both supported video codecs use the V4L2 hardware encoder.
+  message.hardware_encoding = true;
   message.independent_profiles = true;
   message.photo_during_recording = true;
   message.max_width =

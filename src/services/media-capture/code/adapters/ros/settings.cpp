@@ -34,6 +34,7 @@ void ReadProfile(rclcpp::Node& node, Profile& profile) {
   profile.width = Parameter(node, prefix + "width", profile.width);
   profile.height = Parameter(node, prefix + "height", profile.height);
   profile.fps = Parameter(node, prefix + "fps", profile.fps);
+  profile.codec = Parameter(node, prefix + "codec", profile.codec);
   profile.bitrate_kbps =
       Parameter(node, prefix + "bitrate_kbps", profile.bitrate_kbps);
   profile.quality = Parameter(node, prefix + "quality", profile.quality);

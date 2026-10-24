@@ -16,6 +16,11 @@ Both drivers use the standard `module` class. Their packages depend on the
 matching kernel ABI; rebuild them whenever the kernel changes. Selecting a
 different radio does not change the NXP kernel source or configuration.
 
+Recipe ownership is separate: `wfb-ng` builds transport userspace and installs
+radio/integration configuration; `rtl8812au-wfb` and `rtl8812eu-wfb` each build
+one external driver. The package group selects the driver. `media-capture`
+owns both video codecs; `camera-mavlink` reports the selected codec.
+
 Use a dedicated adapter outside normal network management. Start
 `wfb-ng@<interface>.service` with its actual interface name. The service checks
 for the interface and the airborne key before starting. Do not select the
@@ -32,9 +37,13 @@ The packaged router fragment forwards PX4 traffic to that local MAVLink port;
 
 The optional `media-capture.yaml` under the installed WFB-ng data directory is
 a second ROS parameter file, applied after the board's existing camera config.
-It changes only the streaming destination; streaming remains an explicit camera
-control operation. The existing camera service is not automatically restarted
-or redirected by installing this package. It continues to own capture, hardware
+It sets only the radio destination and inherits the codec from `media-capture`;
+streaming remains an explicit camera control operation. The camera defaults
+to H.264. To select H.265, set `preview_codec` and `video_codec` to `h265` in
+the camera configuration and use an H.265 receiver; select `h264` for H.264.
+Recording and streaming share one encoder and require matching active profiles.
+The existing camera service is not automatically restarted or redirected by
+installing this package. It continues to own capture, hardware
 encoding, recording and ROS image publication.
 
 `ground.cfg` in the same data directory is the matching receiver example.
@@ -57,3 +66,9 @@ loss after FEC. These short-range USBIP/WSL results need latency tuning; they
 exclude exposure, encoding and display delay. Normal streaming used 14.3% of
 the board's six-core CPU capacity, including existing perception services.
 Glass-to-glass latency and range remain untested.
+
+Hardware H.265 also passed 720p/15 fps radio reception, ROS state/image
+publication, and onboard recording. The received 38.5-second HEVC recording
+decoded successfully. Normal board CPU was 13.5% of six-core capacity; packet
+delivery was approximately 48 ms median / 271 ms p95 with 0.9% packet loss.
+This used the same 2 Mbit/s target, not a quality-matched bitrate comparison.

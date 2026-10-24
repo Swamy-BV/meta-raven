@@ -150,7 +150,8 @@ void CameraNode::StreamInformation() {
   packet.bitrate = profile.bitrate_kbps * kBitsPerKbit;
   packet.resolution_h = static_cast<std::uint16_t>(profile.width);
   packet.resolution_v = static_cast<std::uint16_t>(profile.height);
-  packet.encoding = VIDEO_STREAM_ENCODING_H264;
+  packet.encoding = profile.codec == "h265" ? VIDEO_STREAM_ENCODING_H265
+                                            : VIDEO_STREAM_ENCODING_H264;
   Text(packet.name, "Camera preview");
   Text(packet.uri, stream_uri_);
   link_.Send(packet, mavlink_msg_video_stream_information_encode_status);

@@ -31,7 +31,9 @@ and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
 - **Camera and media:** `media-capture` provides ROS images, CameraInfo, photos,
   recording and preview controls. IMX477 3840 x 2160 JPEG capture and
   hardware-encoded 1280 x 720 browser video have been tested. ROS applications
-  and MAVLink camera commands use the same capture operations.
+  and MAVLink camera commands use the same capture operations. Hardware H.264
+  (default) and H.265 are selectable; both reached a laptop over WFB-ng at
+  720p/15 fps. Dedicated USB radio drivers are separate from the NXP kernel.
 - **Edge vision:** `vision-engine` publishes standard ROS vision outputs.
   YOLOv8s detection and PP-LCNet vehicle appearance embeddings have run on the
   Neutron NPU. CPU work remains for preprocessing, association, ROS and guidance;
@@ -47,11 +49,12 @@ and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
 
 ## Current progress
 
-Validation snapshot: **23 October 2026**. These are simulation and hardware
+Validation snapshot: **24 October 2026**. These are simulation and hardware
 bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
+| Radio video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency, range and radio telemetry |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
@@ -74,6 +77,8 @@ are shown in the [component view](src/README.md).
 flowchart TD
     source["Camera / files / network video"]
     capture["media-capture<br/>Capture and recording"]
+    radio["WFB-ng<br/>Video radio transport"]
+    receiver["Laptop / ground receiver"]
     vision["vision-engine<br/>NPU inference"]
     tracker["target-tracker<br/>Identity and association"]
     guidance["guidance<br/>Following and trajectories"]
@@ -81,6 +86,8 @@ flowchart TD
     px4["M7 PX4 / NuttX<br/>State estimation and flight control"]
 
     source --> capture
+    capture -->|H.264 / H.265 RTP| radio
+    radio -->|Dedicated USB radios| receiver
     capture -->|ROS images| vision
     vision -->|Detections| tracker
     tracker -->|Tracked observations| guidance
