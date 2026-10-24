@@ -32,6 +32,7 @@ IMAGE_INSTALL:append = " \
     kernel-module-rpmsg-tty2 \
     micro-xrce-dds-agent \
     mavlink-router \
+    packagegroup-raven-wfb \
     px4-msgs \
     media-capture \
     camera-mavlink \

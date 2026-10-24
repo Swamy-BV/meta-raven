@@ -1,0 +1,6 @@
+# Optional second ROS parameter file, after the board's media-capture.yaml.
+# Capturing/recording/ROS settings remain owned by media-capture.
+/**:
+  ros__parameters:
+    stream_host: 127.0.0.1
+    stream_port: 5602

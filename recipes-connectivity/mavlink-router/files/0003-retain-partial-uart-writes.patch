@@ -86,7 +86,7 @@ Signed-off-by: Raven Developers <raven@localhost>
  int UartEndpoint::add_speeds(const std::vector<speed_t> &bauds)
 --- a/src/endpoint.h
 +++ b/src/endpoint.h
-@@ -297,6 +297,6 @@
+@@ -297,8 +297,8 @@
      ~UartEndpoint() override = default;
  
      int write_msg(const struct buffer *pbuf) override;
@@ -94,3 +94,5 @@ Signed-off-by: Raven Developers <raven@localhost>
 +    int flush_pending_msgs() override;
  
      bool setup(UartEndpointConfig config); ///< open UART device and apply config
+ 
+     static const ConfFile::OptionsTable option_table[];

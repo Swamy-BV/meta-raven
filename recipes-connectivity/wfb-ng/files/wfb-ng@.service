@@ -1,0 +1,22 @@
+[Unit]
+Description=WFB-ng airborne radio link on %I
+After=network.target mavlink-router.service
+Wants=mavlink-router.service
+ConditionPathExists=/sys/class/net/%I
+ConditionPathExists=@LOCALSTATEDIR@/lib/wfb-ng/drone.key
+
+[Service]
+Type=simple
+Environment=WIFIBROADCAST_CFG=@SYSCONFDIR@/wfb-ng/air.cfg
+ExecStart=@BINDIR@/wfb-server --profiles drone --wlans %I
+RuntimeDirectory=wfb-ng
+StateDirectory=wfb-ng
+StateDirectoryMode=0700
+UMask=0077
+KillMode=mixed
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
