@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenHD configuration and radio discovery
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStartPre=@BINDIR@/systemd-tmpfiles --create @LIBDIR@/tmpfiles.d/openhd.conf
+ExecStart=@BINDIR@/openhd_sys_utils
+RuntimeDirectory=openhd
+RuntimeDirectoryPreserve=yes
+StateDirectory=openhd
+StateDirectoryMode=0700
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/openhd /run/openhd
+Restart=on-failure
+RestartSec=5

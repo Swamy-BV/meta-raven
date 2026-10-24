@@ -1,0 +1,6 @@
+# Apply after media-capture.yaml when selecting OpenHD as the radio backend.
+/**:
+  ros__parameters:
+    preview_codec: h264
+    stream_host: 127.0.0.1
+    stream_port: 5500

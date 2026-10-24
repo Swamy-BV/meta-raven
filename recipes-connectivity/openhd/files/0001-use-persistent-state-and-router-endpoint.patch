@@ -1,0 +1,217 @@
+From: Raven Developers <raven@localhost>
+Subject: [PATCH] Use persistent state and optional FC loopback endpoint
+
+Upstream-Status: Inappropriate [configuration]
+Signed-off-by: Raven Developers <raven@localhost>
+
+diff --git a/OpenHD/ohd_common/inc/openhd_global_constants.hpp b/OpenHD/ohd_common/inc/openhd_global_constants.hpp
+index af3f350..464ca92 100644
+--- a/OpenHD/ohd_common/inc/openhd_global_constants.hpp
++++ b/OpenHD/ohd_common/inc/openhd_global_constants.hpp
+@@ -88,7 +88,7 @@ static std::string get_ohd_version_as_string() {
+ // If this file does not exist, the default keypair from the default pw (openhd)
+ // is generated at run time.
+ static constexpr auto SECURITY_KEYPAIR_FILENAME =
+-    "/usr/local/share/openhd/txrx.key";
++    "/var/lib/openhd/txrx.key";
+ 
+ }  // namespace openhd
+ #endif  // OPEN_HD_OPNHD_GLOBAL_CONSTANTS_H
+diff --git a/OpenHD/ohd_common/inc/openhd_settings_directories.h b/OpenHD/ohd_common/inc/openhd_settings_directories.h
+index b46492b..ce3a880 100644
+--- a/OpenHD/ohd_common/inc/openhd_settings_directories.h
++++ b/OpenHD/ohd_common/inc/openhd_settings_directories.h
+@@ -40,7 +40,7 @@ namespace openhd {
+ // !!!! Had to be reverted - writing to /boot on rpi is too prone to file system
+ // corruption !!!
+ // static constexpr auto SETTINGS_BASE_PATH ="/boot/openhd/settings/";
+-static constexpr auto SETTINGS_BASE_PATH = "/usr/local/share/openhd/";
++static constexpr auto SETTINGS_BASE_PATH = "/var/lib/openhd/";
+ // for example, the unique id
+ static std::string get_unit_id_file_path() {
+   return std::string(SETTINGS_BASE_PATH) + "unit.id";
+diff --git a/OpenHD/ohd_common/src/config_paths.cpp b/OpenHD/ohd_common/src/config_paths.cpp
+index 3a10f4a..9bf65d2 100644
+--- a/OpenHD/ohd_common/src/config_paths.cpp
++++ b/OpenHD/ohd_common/src/config_paths.cpp
+@@ -32,10 +32,10 @@
+ static char* CONFIG_BASE_PATH = nullptr;
+ static char* VIDEO_PATH = nullptr;
+ 
+-const char* getConfigBasePath() { return "/Config/"; }
++const char* getConfigBasePath() { return "/var/lib/openhd/config/"; }
+ 
+ const char* getVideoPath() {
+-  static const char* VIDEO_DIR = "/Video/";
++  static const char* VIDEO_DIR = "/data/openhd/";
+   if (!OHDFilesystemUtil::exists(VIDEO_DIR)) {
+     OHDFilesystemUtil::create_directories(VIDEO_DIR);
+   }
+diff --git a/OpenHD/ohd_common/src/openhd_config.cpp b/OpenHD/ohd_common/src/openhd_config.cpp
+index 2a8a9e0..1bf321f 100644
+--- a/OpenHD/ohd_common/src/openhd_config.cpp
++++ b/OpenHD/ohd_common/src/openhd_config.cpp
+@@ -24,6 +24,7 @@
+ #include "openhd_config.h"
+ 
+ #include <cctype>
++#include <cstdlib>
+ #include <iostream>
+ 
+ #include "openhd_sock.h"
+@@ -90,6 +91,12 @@ static openhd::Config load_or_default() {
+   ret.MICROHARD_TELEMETRY_PORT = settings.microhard_telemetry_port;
+   ret.GEN_ENABLE_LAST_KNOWN_POSITION = settings.gen_enable_last_known_position;
+   ret.GEN_RF_METRICS_LEVEL = settings.gen_rf_metrics_level;
++  // The service instance selects only the dedicated radio, never management Wi-Fi.
++  const auto* radio = std::getenv("OPENHD_RADIO");
++  if (radio != nullptr && *radio != '\0') {
++    ret.WIFI_ENABLE_AUTODETECT = false;
++    ret.WIFI_WB_LINK_CARDS = {radio};
++  }
+   return ret;
+ }
+ 
+diff --git a/OpenHD/ohd_common/src/openhd_spdlog.cpp b/OpenHD/ohd_common/src/openhd_spdlog.cpp
+index 096a9f3..9548a4c 100644
+--- a/OpenHD/ohd_common/src/openhd_spdlog.cpp
++++ b/OpenHD/ohd_common/src/openhd_spdlog.cpp
+@@ -112,7 +112,7 @@ std::shared_ptr<spdlog::logger> openhd::log::create_or_get(
+   if (ret == nullptr) {
+     auto created = spdlog::stdout_color_mt(logger_name);
+     assert(created);
+-    if (OHDFilesystemUtil::exists("/usr/local/share/openhd/debug.txt")) {
++    if (OHDFilesystemUtil::exists("/var/lib/openhd/debug.txt")) {
+       created->set_level(spdlog::level::debug);
+     } else {
+       created->set_level(spdlog::level::warn);
+diff --git a/OpenHD/ohd_telemetry/src/AirTelemetry.cpp b/OpenHD/ohd_telemetry/src/AirTelemetry.cpp
+index 27df7e9..625f6ae 100644
+--- a/OpenHD/ohd_telemetry/src/AirTelemetry.cpp
++++ b/OpenHD/ohd_telemetry/src/AirTelemetry.cpp
+@@ -24,6 +24,8 @@
+ #include "AirTelemetry.h"
+ 
+ #include <chrono>
++#include <cstdlib>
++#include <cstring>
+ 
+ #include "mav_helper.h"
+ #include "mavsdk_temporary/XMavlinkParamProvider.h"
+@@ -62,7 +64,16 @@ AirTelemetry::AirTelemetry() : MavlinkSystem(OHD_SYS_ID_AIR) {
+           on_messages_ground_unit(messages);
+         });
+   }
+-  setup_uart();
++  const auto* fc_udp = std::getenv("OPENHD_FC_UDP");
++  if (fc_udp != nullptr && std::strcmp(fc_udp, "1") == 0) {
++    // Router listens on 14563; OpenHD listens on 14562. Both are loopback only.
++    m_fc_udp = std::make_unique<UDPEndpoint>("fc_udp", 14563, 14562);
++    m_fc_udp->registerCallback([this](std::vector<MavlinkMessage> messages) {
++      on_messages_fc(messages);
++    });
++  } else {
++    setup_uart();
++  }
+   setup_openhd_uart_telemetry();
+   m_console->debug("Created AirTelemetry");
+ }
+@@ -74,7 +85,11 @@ void AirTelemetry::send_messages_fc(std::vector<MavlinkMessage>& messages) {
+       split_into_generic_and_local_only(messages, OHD_SYS_ID_AIR);
+   // NOTE: Remember there is a hack in place for rc channels override in regards
+   // to the sender sys id
+-  m_fc_serial->send_messages_if_enabled(generic);
++  if (m_fc_udp) {
++    m_fc_udp->sendMessages(generic);
++  } else {
++    m_fc_serial->send_messages_if_enabled(generic);
++  }
+ }
+ 
+ void AirTelemetry::send_messages_ground_unit(
+@@ -172,6 +187,14 @@ void AirTelemetry::loop_infinite(bool& terminate,
+       for (auto& component : m_components) {
+         auto messages = component->generate_mavlink_messages();
+         send_messages_ground_unit(messages);
++        if (m_fc_udp && component == m_ohd_main_component) {
++          // Standard heartbeat registration also recovers after router restarts.
++          for (const auto& message : messages) {
++            if (message.m.msgid == MAVLINK_MSG_ID_HEARTBEAT) {
++              m_fc_udp->sendMessages({message});
++            }
++          }
++        }
+       }
+     }
+     const auto loopDelta = std::chrono::steady_clock::now() - loopBegin;
+@@ -239,14 +262,32 @@ std::vector<openhd::Setting> AirTelemetry::get_all_settings() {
+     // We just accept anything
+     m_air_settings->unsafe_get_settings().fc_uart_connection_type = value;
+     m_air_settings->persist();
++    const auto* fc_udp = std::getenv("OPENHD_FC_UDP");
++  if (fc_udp != nullptr && std::strcmp(fc_udp, "1") == 0) {
++    // Router listens on 14563; OpenHD listens on 14562. Both are loopback only.
++    m_fc_udp = std::make_unique<UDPEndpoint>("fc_udp", 14563, 14562);
++    m_fc_udp->registerCallback([this](std::vector<MavlinkMessage> messages) {
++      on_messages_fc(messages);
++    });
++  } else {
+     setup_uart();
++  }
+     return true;
+   };
+   auto c_fc_uart_baudrate = [this](std::string, int value) {
+     if (!SerialEndpoint::is_valid_linux_baudrate(value)) return false;
+     m_air_settings->unsafe_get_settings().fc_uart_baudrate = value;
+     m_air_settings->persist();
++    const auto* fc_udp = std::getenv("OPENHD_FC_UDP");
++  if (fc_udp != nullptr && std::strcmp(fc_udp, "1") == 0) {
++    // Router listens on 14563; OpenHD listens on 14562. Both are loopback only.
++    m_fc_udp = std::make_unique<UDPEndpoint>("fc_udp", 14563, 14562);
++    m_fc_udp->registerCallback([this](std::vector<MavlinkMessage> messages) {
++      on_messages_fc(messages);
++    });
++  } else {
+     setup_uart();
++  }
+     return true;
+   };
+   auto c_fc_uart_flow_control = [this](std::string, int value) {
+@@ -255,7 +296,16 @@ std::vector<openhd::Setting> AirTelemetry::get_all_settings() {
+     }
+     m_air_settings->unsafe_get_settings().fc_uart_flow_control = value;
+     m_air_settings->persist();
++    const auto* fc_udp = std::getenv("OPENHD_FC_UDP");
++  if (fc_udp != nullptr && std::strcmp(fc_udp, "1") == 0) {
++    // Router listens on 14563; OpenHD listens on 14562. Both are loopback only.
++    m_fc_udp = std::make_unique<UDPEndpoint>("fc_udp", 14563, 14562);
++    m_fc_udp->registerCallback([this](std::vector<MavlinkMessage> messages) {
++      on_messages_fc(messages);
++    });
++  } else {
+     setup_uart();
++  }
+     return true;
+   };
+   auto c_fc_battery_n_cells = [this](std::string, int value) {
+diff --git a/OpenHD/ohd_telemetry/src/AirTelemetry.h b/OpenHD/ohd_telemetry/src/AirTelemetry.h
+index 908af57..8eb86fc 100644
+--- a/OpenHD/ohd_telemetry/src/AirTelemetry.h
++++ b/OpenHD/ohd_telemetry/src/AirTelemetry.h
+@@ -28,6 +28,7 @@
+ #include <string>
+ 
+ #include "endpoints/SerialEndpoint.h"
++#include "endpoints/UDPEndpoint.h"
+ #include "internal/OHDMainComponent.h"
+ #include "internal/UartDeduplicator.h"
+ #include "internal/UartPrioritizer.h"
+@@ -111,6 +112,8 @@ class AirTelemetry : public MavlinkSystem {
+  private:
+   std::unique_ptr<openhd::telemetry::air::SettingsHolder> m_air_settings;
+   std::unique_ptr<SerialEndpointManager> m_fc_serial;
++  // Loopback router endpoint, owned for the lifetime of air telemetry.
++  std::unique_ptr<UDPEndpoint> m_fc_udp;
+   std::unique_ptr<SerialEndpointManager> m_openhd_uart_serial;
+   // send/receive data via wb
+   std::unique_ptr<WBEndpoint> m_wb_endpoint;

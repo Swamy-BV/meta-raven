@@ -1,0 +1,27 @@
+[Unit]
+Description=OpenHD airborne radio backend on %I
+After=network.target openhd-sysutils.service mavlink-router.service
+Requires=openhd-sysutils.service
+Wants=mavlink-router.service
+Conflicts=wfb-ng@%i.service
+ConditionPathExists=/sys/class/net/%I
+ConditionPathExists=|/var/lib/openhd/txrx.key
+ConditionPathExists=|/var/lib/openhd/config/password.txt
+
+[Service]
+Type=simple
+Environment=OPENHD_FC_UDP=1
+Environment=OPENHD_RADIO=%I
+ExecStart=@BINDIR@/openhd --air --no-hotspot
+RuntimeDirectory=openhd
+RuntimeDirectoryPreserve=yes
+StateDirectory=openhd
+StateDirectoryMode=0700
+UMask=0077
+KillMode=mixed
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

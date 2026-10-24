@@ -19,6 +19,8 @@ IMAGE_FEATURES += "ssh-server-openssh read-only-rootfs"
 IMAGE_ROOTFS_SIZE = "${@str(int(d.getVar('RAVEN_ROOTFS_SIZE_MIB')) * 1024)}"
 IMAGE_ROOTFS_MAXSIZE = "${IMAGE_ROOTFS_SIZE}"
 IMAGE_ROOTFS_EXTRA_SPACE = "0"
+# Select packagegroup-raven-openhd in local.conf to evaluate the alternative.
+VIRTUAL-RUNTIME_raven-radio-link ?= "packagegroup-raven-wfb"
 IMAGE_INSTALL:append = " \
     ros-base \
     iproute2 \
@@ -32,7 +34,7 @@ IMAGE_INSTALL:append = " \
     kernel-module-rpmsg-tty2 \
     micro-xrce-dds-agent \
     mavlink-router \
-    packagegroup-raven-wfb \
+    ${VIRTUAL-RUNTIME_raven-radio-link} \
     px4-msgs \
     media-capture \
     camera-mavlink \

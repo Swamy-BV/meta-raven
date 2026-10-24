@@ -26,6 +26,7 @@ flowchart TD
 flowchart TD
     ground["Ground station"]
     router["mavlink-router"]
+    radio["Radio backend<br/>WFB-ng default / OpenHD optional"]
     px4["M7 PX4"]
     camera["camera-mavlink"]
     capture["media-capture"]
@@ -33,7 +34,10 @@ flowchart TD
     preview["MediaMTX"]
     browser["Browser"]
 
-    ground <-->|MAVLink| router
+    ground <-->|IP MAVLink| router
+    ground <-->|Radio video and MAVLink| radio
+    radio <-->|Local MAVLink| router
+    capture -->|H.264 / H.265 RTP| radio
     router <-->|RPMsg MAVLink| px4
     router <-->|Camera MAVLink| camera
     camera <-->|ROS controls and events| capture

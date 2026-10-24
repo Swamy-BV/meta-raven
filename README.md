@@ -54,8 +54,9 @@ bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
-| Radio video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency and range |
-| Radio telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
+| WFB-ng video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency and range |
+| WFB-ng telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
+| OpenHD (optional) | Yocto package group and RTL8812AU driver built; 58.4-second hardware H.264 720p/15 fps recording decoded at 14.9 fps. PX4/camera MAVLink information requests passed 20/20 alone and 20/20 with video using standard command retries | Single-attempt concurrent run passed 19/20; one retry was needed in the recovery run, and ping replies were 9/10 with video. Qualify loss, longer runs, H.265 and range |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
@@ -78,7 +79,7 @@ are shown in the [component view](src/README.md).
 flowchart TD
     source["Camera / files / network video"]
     capture["media-capture<br/>Capture and recording"]
-    radio["WFB-ng<br/>Video radio transport"]
+    radio["Radio backend<br/>WFB-ng default / OpenHD optional"]
     receiver["Laptop / ground receiver"]
     vision["vision-engine<br/>NPU inference"]
     tracker["target-tracker<br/>Identity and association"]
@@ -134,6 +135,28 @@ bitbake raven-image-swu
 
 This target builds the Linux image, PX4 firmware and boot components required
 for the SWUpdate bundle.
+
+## Optional OpenHD backend
+
+WFB-ng remains the default radio package. To select OpenHD instead, set this in
+`build/conf/local.conf` before building the image:
+
+```bitbake
+VIRTUAL-RUNTIME_raven-radio-link = "packagegroup-raven-openhd"
+```
+
+`bitbake packagegroup-raven-openhd` builds the headless backend, SysUtils and
+its separate RTL8812AU driver without building an image. Both radio services
+are opt-in. Start `openhd@<interface>` only on the dedicated USB radio; configure
+media-capture with the additional `/usr/share/openhd/media-capture.yaml` profile
+and start streaming through its existing controls. MAVLink uses the existing
+router; the M7 DDS connection stays separate.
+
+OpenHD and WFB-ng need matching air/ground software and their own pairing keys.
+Do not run them together on the same radio. External encoder bitrate remains
+controlled by media-capture; OpenHD adaptive bitrate feedback is not connected.
+OpenHD source contains an additional
+non-military-use notice; its packages preserve that notice alongside GPLv3.
 
 ## Contact
 

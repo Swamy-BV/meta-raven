@@ -1,0 +1,32 @@
+From: Raven Developers <raven@localhost>
+Subject: [PATCH] Include required standard headers explicitly
+
+GCC 15 no longer supplies these declarations through transitive includes.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Developers <raven@localhost>
+
+diff --git a/OpenHD/ohd_telemetry/src/routing/MavlinkSystem.hpp b/OpenHD/ohd_telemetry/src/routing/MavlinkSystem.hpp
+index a75dd21..f286083 100644
+--- a/OpenHD/ohd_telemetry/src/routing/MavlinkSystem.hpp
++++ b/OpenHD/ohd_telemetry/src/routing/MavlinkSystem.hpp
+@@ -24,6 +24,7 @@
+ #ifndef OPENHD_OPENHD_OHD_TELEMETRY_SRC_ROUTING_MAVLINKSYSTEM_H_
+ #define OPENHD_OPENHD_OHD_TELEMETRY_SRC_ROUTING_MAVLINKSYSTEM_H_
+ 
++#include <cstdint>
+ #include <map>
+ #include <memory>
+ #include <vector>
+diff --git a/OpenHD/ohd_video/src/validate_settings.cpp b/OpenHD/ohd_video/src/validate_settings.cpp
+index 4877e1a..3568011 100644
+--- a/OpenHD/ohd_video/src/validate_settings.cpp
++++ b/OpenHD/ohd_video/src/validate_settings.cpp
+@@ -24,6 +24,7 @@
+ #include "validate_settings.h"
+ 
+ #include <regex>
++#include <sstream>
+ 
+ #include "openhd_spdlog.h"
+ #include "openhd_spdlog_include.h"

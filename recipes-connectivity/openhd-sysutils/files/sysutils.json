@@ -1,0 +1,16 @@
+{
+  "firstboot": false,
+  "set_hostname": false,
+  "run_mode": "air",
+  "camera_type": 2,
+  "camera2_type": -1,
+  "camera_resolution_fps": "1280x720@15",
+  "wifi_enable_autodetect": false,
+  "wifi_wb_link_cards": "wfb0",
+  "wifi_hotspot_card": "",
+  "wifi_local_network_enable": false,
+  "disable_ethernet_link": true,
+  "disable_microhard_detection": true,
+  "gen_enable_last_known_position": false,
+  "disable_openhd_service": true
+}
