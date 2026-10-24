@@ -72,3 +72,12 @@ publication, and onboard recording. The received 38.5-second HEVC recording
 decoded successfully. Normal board CPU was 13.5% of six-core capacity; packet
 delivery was approximately 48 ms median / 271 ms p95 with 0.9% packet loss.
 This used the same 2 Mbit/s target, not a quality-matched bitrate comparison.
+
+Bidirectional MAVLink passed 40/40 information requests with the requested
+response and accepted acknowledgement from M7 PX4 or the Linux camera component.
+Half ran alongside H.264 video decoding at about 15 fps. The laptop client used
+only loopback UDP 14550, with no IP telemetry fallback. A one-minute run received
+61 PX4 and 61 camera heartbeats. Ping replies were 10/10 without video (171 ms
+median round trip) and 9/10 with video. The profiles retain upstream's 100 ms
+MAVLink aggregation window; latency, loss and range need further qualification.
+The running board used a temporary router fragment; no SWU was flashed.

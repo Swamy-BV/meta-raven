@@ -54,7 +54,8 @@ bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
-| Radio video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency, range and radio telemetry |
+| Radio video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency and range |
+| Radio telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
