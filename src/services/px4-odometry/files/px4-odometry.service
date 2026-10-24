@@ -1,0 +1,31 @@
+[Unit]
+Description=Validated visual odometry to PX4 DDS adapter
+ConditionPathExists=/var/lib/px4-odometry/enable
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=px4-odometry
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=@ROS_PREFIX@/lib/px4_odometry/px4-odometry --ros-args --params-file /etc/px4-odometry.yaml --remap __ns:=/localization/px4
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=5
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

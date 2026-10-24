@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    use_sim_time: false
+    input_topic: /localization/vio/odometry
+    output_topic: /fmu/in/vehicle_visual_odometry
+    world_frame: global
+    body_frame: imu
+    max_speed_mps: 10.0

@@ -34,6 +34,7 @@ SRC_URI = "\
     git://github.com/nanomsg/nng.git;protocol=https;nobranch=1;name=nng;destsuffix=nng \
     git://github.com/msgpack/msgpack-c.git;protocol=https;nobranch=1;name=msgpack;destsuffix=msgpack \
     ${PROJECTAIRSIM_JSON_URI};name=json;subdir=json;downloadfilename=${BP}-json.hpp \
+    file://0001-map-sensor-clock-epoch.patch;patchdir=../../ \
 "
 SRCREV_airsim = "09755454b8d82b0231af7e59fd1ab8f980ff32c5"
 SRCREV_nng = "84aa701f42968bf536141a24e826da66963b571a"

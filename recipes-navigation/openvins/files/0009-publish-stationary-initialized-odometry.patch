@@ -1,0 +1,34 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Publish initialized odometry after accepted stationary updates
+
+The initialized accessor waits for timelastupdate. Zero-velocity updates
+return before the feature-update path sets it, withholding odometry while
+the vehicle is stationary. Mark accepted zero-velocity updates as valid
+state updates so consumers can establish readiness before takeoff.
+Keep upstream stationarity tests and feature-update behavior unchanged.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+---
+--- a/ov_msckf/src/core/VioManager.cpp
++++ b/ov_msckf/src/core/VioManager.cpp
+@@ -233,6 +233,9 @@
+       propagator->clean_old_imu_measurements(timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
+       updaterZUPT->clean_old_imu_measurements(timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
+       propagator->invalidate_cache();
++      // An accepted stationary update is a valid initialized estimate too.
++      // Allow odometry consumers to become ready before takeoff motion.
++      timelastupdate = timestamp;
+       return;
+     }
+   }
+@@ -306,6 +309,9 @@
+       propagator->clean_old_imu_measurements(message.timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
+       updaterZUPT->clean_old_imu_measurements(message.timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
+       propagator->invalidate_cache();
++      // An accepted stationary update is a valid initialized estimate too.
++      // Allow odometry consumers to become ready before takeoff motion.
++      timelastupdate = message.timestamp;
+       return;
+     }
+   }

@@ -59,21 +59,24 @@ flowchart TD
 
 ## Visual odometry evaluation
 
-OpenVINS runs in shadow mode on i.MX95 Linux. The upstream AirSim C++ ROS 2
-bridge supplies the navigation camera and IMU; a separate evaluator receives
-ground truth. AirSim's internal pilot flies these tests. PX4 fusion remains
-an integration step after initialization, drift and timing are qualified.
+`visual-odometry` runs the upstream OpenVINS ROS 2 node on i.MX95 Linux.
+`px4-odometry` checks acquisition time, frames and covariance, then converts
+the estimate into PX4 FRD measurements over the existing DDS link. The adapter
+is disabled by default. GPS-aiding-disabled M7 hover and landing have passed
+with horizontal vision fusion; barometer and magnetometer remain active.
+VIO height drift and more motion cases still need qualification.
 
 ```mermaid
 flowchart TD
     sim["Windows AirSim"]
     bridge["Upstream C++ ROS 2 bridge"]
-    camera["Fixed navigation camera<br/>Image + CameraInfo"]
-    imu["Navigation IMU<br/>Imu"]
+    camera["Fixed navigation camera<br/>sensor_msgs/Image"]
+    imu["Navigation IMU<br/>sensor_msgs/Imu"]
     vio["visual-odometry<br/>OpenVINS on i.MX95"]
     output["/localization/vio/odometry<br/>nav_msgs/Odometry"]
     evaluation["Independent drift evaluation"]
-    adapter["PX4 odometry adapter<br/>Planned"]
+    adapter["px4-odometry<br/>Validate and convert"]
+    dds["Micro XRCE-DDS Agent"]
     px4["M7 PX4 EKF2"]
 
     sim --> bridge
@@ -84,6 +87,7 @@ flowchart TD
     vio --> output
     output --> evaluation
     sim -.->|Ground truth only| evaluation
-    output -.-> adapter
-    adapter -.->|Existing DDS link| px4
+    output --> adapter
+    adapter -->|VehicleOdometry| dds
+    dds <-->|RPMsg| px4
 ```

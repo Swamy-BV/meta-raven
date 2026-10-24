@@ -1,0 +1,75 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Make visualization work optional and bound ROS path history
+
+Localization-only deployments need not reconstruct loop-closure landmarks
+or build paths with no subscribers. Preserve estimator updates and keep
+upstream visualization enabled by default.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+---
+--- a/ov_msckf/src/core/VioManagerOptions.h
++++ b/ov_msckf/src/core/VioManagerOptions.h
+@@ -408,6 +408,9 @@
+   /// Will half the resolution all tracking image (aruco will be 1/4 instead of halved if dowsize_aruoc also enabled)
+   bool downsample_cameras = false;
+ 
++  // Optional landmark reconstruction for visualization/loop-closure consumers.
++  bool enable_feature_cloud = true;
++
+   /// Threads our front-end should try to use (opencv uses this also)
+   int num_opencv_threads = 4;
+ 
+@@ -457,6 +460,7 @@
+       parser->parse_config("use_aruco", use_aruco);
+       parser->parse_config("downsize_aruco", downsize_aruco);
+       parser->parse_config("downsample_cameras", downsample_cameras);
++      parser->parse_config("enable_feature_cloud", enable_feature_cloud, false);
+       parser->parse_config("num_opencv_threads", num_opencv_threads);
+       parser->parse_config("multi_threading_pubs", use_multi_threading_pubs, false);
+       parser->parse_config("multi_threading_subs", use_multi_threading_subs, false);
+--- a/ov_msckf/src/core/VioManager.cpp
++++ b/ov_msckf/src/core/VioManager.cpp
+@@ -560,7 +560,8 @@
+   if (message.sensor_ids.at(0) == 0) {
+ 
+     // Re-triangulate features
+-    retriangulate_active_tracks(message);
++    if (params.enable_feature_cloud)
++      retriangulate_active_tracks(message);
+ 
+     // Clear the MSCKF features only on the base camera
+     // Thus we should be able to visualize the other unique camera stream
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -611,6 +611,9 @@
+ 
+ void ROS2Visualizer::publish_state() {
+ 
++  if (pub_poseimu->get_subscription_count() == 0 && pub_pathimu->get_subscription_count() == 0)
++    return;
++
+   // Get the current state
+   std::shared_ptr<State> state = _app->get_state();
+ 
+@@ -641,7 +644,10 @@
+       poseIinM.pose.covariance[6 * r + c] = covariance_posori(r, c);
+     }
+   }
+-  pub_poseimu->publish(poseIinM);
++  if (pub_poseimu->get_subscription_count() != 0)
++    pub_poseimu->publish(poseIinM);
++  if (pub_pathimu->get_subscription_count() == 0)
++    return;
+ 
+   //=========================================================
+   //=========================================================
+@@ -650,6 +656,8 @@
+   geometry_msgs::msg::PoseStamped posetemp;
+   posetemp.header = poseIinM.header;
+   posetemp.pose = poseIinM.pose.pose;
++  if (poses_imu.size() >= 16384)
++    poses_imu.erase(poses_imu.begin(), poses_imu.begin() + 8192);
+   poses_imu.push_back(posetemp);
+ 
+   // Create our path (imu)

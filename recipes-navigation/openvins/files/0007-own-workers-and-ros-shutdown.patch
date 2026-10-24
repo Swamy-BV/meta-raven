@@ -1,0 +1,231 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Join estimator workers before destroying ROS resources
+
+Keep asynchronous initialization, image updates and visualization owned by
+their objects. Release ROS publishers and plugin objects before the node and
+context so shutdown does not depend on static destruction order.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+---
+--- a/ov_msckf/src/core/VioManager.h
++++ b/ov_msckf/src/core/VioManager.h
+@@ -30,6 +30,7 @@
+ #include <memory>
+ #include <mutex>
+ #include <string>
++#include <thread>
+ 
+ #include "VioManagerOptions.h"
+ 
+@@ -67,6 +68,7 @@
+    * @param params_ Parameters loaded from either ROS or CMDLINE
+    */
+   VioManager(VioManagerOptions &params_);
++  ~VioManager();
+ 
+   /**
+    * @brief Feed function for inertial data
+@@ -224,6 +226,7 @@
+ 
+   // Threads and their atomics
+   std::atomic<bool> thread_init_running, thread_init_success;
++  std::thread initialization_thread;
+ 
+   // If we did a zero velocity update
+   bool did_zupt_update = false;
+--- a/ov_msckf/src/core/VioManager.cpp
++++ b/ov_msckf/src/core/VioManager.cpp
+@@ -47,6 +47,11 @@
+ using namespace ov_type;
+ using namespace ov_msckf;
+ 
++VioManager::~VioManager() {
++  if (initialization_thread.joinable())
++    initialization_thread.join();
++}
++
+ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false), thread_init_success(false) {
+ 
+   // Nice startup message
+--- a/ov_msckf/src/core/VioManagerHelper.cpp
++++ b/ov_msckf/src/core/VioManagerHelper.cpp
+@@ -93,7 +93,9 @@
+ 
+   // Run the initialization in a second thread so it can go as slow as it desires
+   thread_init_running = true;
+-  std::thread thread([&] {
++  if (initialization_thread.joinable())
++    initialization_thread.join();
++  initialization_thread = std::thread([this] {
+     // Returns from our initializer
+     double timestamp;
+     Eigen::MatrixXd covariance;
+@@ -177,12 +179,8 @@
+     thread_init_running = false;
+   });
+ 
+-  // If we are single threaded, then run single threaded
+-  // Otherwise detach this thread so it runs in the background!
+   if (!params.use_multi_threading_subs) {
+-    thread.join();
+-  } else {
+-    thread.detach();
++    initialization_thread.join();
+   }
+   return false;
+ }
+--- a/ov_msckf/src/ros/ROS2Visualizer.h
++++ b/ov_msckf/src/ros/ROS2Visualizer.h
+@@ -49,6 +49,7 @@
+ #include <fstream>
+ #include <memory>
+ #include <mutex>
++#include <thread>
+ 
+ #include <Eigen/Eigen>
+ #include <boost/date_time/posix_time/posix_time.hpp>
+@@ -91,6 +92,10 @@
+    * @param parser Configuration file parser
+    */
+   void setup_subscribers(std::shared_ptr<ov_core::YamlParser> parser);
++
++  ~ROS2Visualizer();
++  // Call after the executor stops, before releasing ROS/plugin resources.
++  void stop();
+ 
+   /**
+    * @brief Will visualize the system if we have new things
+@@ -181,6 +186,9 @@
+ 
+   // Thread atomics
+   std::atomic<bool> thread_update_running;
++  std::atomic<bool> stopping{false};
++  std::thread publication_thread;
++  std::thread update_thread;
+ 
+   /// Queue up camera measurements sorted by time and trigger once we have
+   /// exactly one IMU measurement with timestamp newer than the camera measurement
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -151,15 +151,24 @@
+ 
+   // Start thread for the image publishing
+   if (_app->get_params().use_multi_threading_pubs) {
+-    std::thread thread([&] {
+-      rclcpp::Rate loop_rate(20);
+-      while (rclcpp::ok()) {
++    publication_thread = std::thread([this] {
++      rclcpp::WallRate loop_rate(20);
++      while (!stopping && rclcpp::ok()) {
+         publish_images();
+         loop_rate.sleep();
+       }
+     });
+-    thread.detach();
+-  }
++  }
++}
++
++ROS2Visualizer::~ROS2Visualizer() { stop(); }
++
++void ROS2Visualizer::stop() {
++  stopping = true;
++  if (update_thread.joinable())
++    update_thread.join();
++  if (publication_thread.joinable())
++    publication_thread.join();
+ }
+ 
+ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> parser) {
+@@ -448,6 +457,8 @@
+ }
+ 
+ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr msg) {
++  if (stopping)
++    return;
+ 
+   // convert into correct format
+   ov_core::ImuData message;
+@@ -465,7 +476,9 @@
+   if (thread_update_running)
+     return;
+   thread_update_running = true;
+-  std::thread thread([this, imu_timestamp = message.timestamp] {
++  if (update_thread.joinable())
++    update_thread.join();
++  update_thread = std::thread([this, imu_timestamp = message.timestamp] {
+     // Lock on the queue (prevents new images from appending)
+     std::lock_guard<std::mutex> lck(camera_queue_mtx);
+ 
+@@ -484,7 +497,7 @@
+       // Loop through our queue and see if we are able to process any of our camera measurements
+       // We are able to process if we have at least one IMU measurement greater than the camera time
+       double timestamp_imu_inC = imu_timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
+-      while (!camera_queue.empty() && camera_queue.at(0).timestamp < timestamp_imu_inC) {
++      while (!stopping && !camera_queue.empty() && camera_queue.at(0).timestamp < timestamp_imu_inC) {
+         auto rT0_1 = boost::posix_time::microsec_clock::local_time();
+         double update_dt = 100.0 * (timestamp_imu_inC - camera_queue.at(0).timestamp);
+         _app->feed_measurement_camera(camera_queue.at(0));
+@@ -498,12 +511,8 @@
+     thread_update_running = false;
+   });
+ 
+-  // If we are single threaded, then run single threaded
+-  // Otherwise detach this thread so it runs in the background!
+   if (!_app->get_params().use_multi_threading_subs) {
+-    thread.join();
+-  } else {
+-    thread.detach();
++    update_thread.join();
+   }
+ }
+ 
+--- a/ov_msckf/src/run_subscribe_msckf.cpp
++++ b/ov_msckf/src/run_subscribe_msckf.cpp
+@@ -35,12 +35,6 @@
+ 
+ using namespace ov_msckf;
+ 
+-std::shared_ptr<VioManager> sys;
+-#if ROS_AVAILABLE == 1
+-std::shared_ptr<ROS1Visualizer> viz;
+-#elif ROS_AVAILABLE == 2
+-std::shared_ptr<ROS2Visualizer> viz;
+-#endif
+ 
+ // Main function
+ int main(int argc, char **argv) {
+@@ -78,6 +72,13 @@
+   std::string verbosity = "DEBUG";
+   parser->parse_config("verbosity", verbosity);
+   ov_core::Printer::setPrintLevel(verbosity);
++
++  std::shared_ptr<VioManager> sys;
++  #if ROS_AVAILABLE == 1
++  std::shared_ptr<ROS1Visualizer> viz;
++  #elif ROS_AVAILABLE == 2
++  std::shared_ptr<ROS2Visualizer> viz;
++  #endif
+ 
+   // Create our VIO system
+   VioManagerOptions params;
+@@ -117,6 +118,8 @@
+   rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), static_cast<size_t>(executor_threads));
+   executor.add_node(node);
+   executor.spin();
++  executor.remove_node(node);
++  viz->stop();
+ #endif
+ 
+   // Final visualization
+@@ -124,5 +127,9 @@
+ #if ROS_AVAILABLE == 1
+   ros::shutdown();
+ #elif ROS_AVAILABLE == 2
++  viz.reset();
++  sys.reset();
++  parser.reset();
++  node.reset();
+   rclcpp::shutdown();
+ #endif

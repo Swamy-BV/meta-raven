@@ -1,0 +1,54 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Allow explicit sensor-clock epoch translation for HITL
+
+Preserve source acquisition timestamps and intervals, applying only an
+explicitly supplied constant epoch offset. The default remains unchanged.
+Reject invalid or overflowing timestamps instead of stamping with arrival time.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+---
+--- a/ros/projectairsim_ros2_cpp/src/projectairsim_ros2_cpp_node.cpp
++++ b/ros/projectairsim_ros2_cpp/src/projectairsim_ros2_cpp_node.cpp
+@@ -120,7 +120,11 @@
+                                  std::int64_t time_stamp) {
+   std_msgs::msg::Header header;
+   header.frame_id = frame_id;
+-  if (time_stamp < 0) {
++  std::int64_t offset = 0;
++  node.get_parameter_or("timestamp_offset_ns", offset, std::int64_t{0});
++  if (time_stamp <= 0 || offset == std::numeric_limits<std::int64_t>::min() ||
++      (offset < 0 && time_stamp < -offset) ||
++      (offset > 0 && time_stamp > std::numeric_limits<std::int64_t>::max() - offset)) {
+     RCLCPP_WARN_THROTTLE(
+         node.get_logger(), *node.get_clock(), 5000,
+         "Sensor message for frame '%s' has an invalid timestamp; publishing "
+@@ -129,7 +133,7 @@
+     return header;
+   }
+ 
+-  header.stamp = rclcpp::Time(time_stamp);
++  header.stamp = rclcpp::Time(time_stamp + offset);
+   return header;
+ }
+ 
+@@ -168,6 +172,8 @@
+       : Node("projectairsim_ros2_cpp_node"),
+         client_(std::make_shared<pasc::Client>()),
+         world_(std::make_shared<pasc::World>()) {
++    // Keep acquisition intervals intact when mapping a calibrated host clock to UTC.
++    declare_parameter<std::int64_t>("timestamp_offset_ns", 0);
+     address_ = declare_parameter<std::string>("address", "127.0.0.1");
+     port_topics_ =
+         declare_parameter<int>("port_topics", pasc::Client::kPortTopicsDefault);
+@@ -386,9 +392,7 @@
+       has_clock_sample_.store(true, std::memory_order_release);
+ 
+       rosgraph_msgs::msg::Clock clock_msg;
+-      clock_msg.clock.sec = static_cast<int32_t>(nanosec / 1000000000LL);
+-      clock_msg.clock.nanosec =
+-          static_cast<uint32_t>(nanosec % 1000000000LL);
++      clock_msg.clock = MakeHeader(*this, "", nanosec).stamp;
+       clock_publisher_->publish(clock_msg);
+     };
+   }

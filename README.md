@@ -59,7 +59,7 @@ bring-up results, not physical flight qualification.
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
 | Target-loss handling | Hold, landing and disarm exercised in the simulation test harness | Qualify recovery transitions and independent safety supervision |
-| GPS-denied navigation | OpenVINS runs on i.MX95 with AirSim camera + IMU; two 42 m shadow tests measured 0.83 / 1.26 m position RMSE and 0.87 / 1.23 m final drift | Improve initialization/climb error and qualify more motion cases before external-odometry fusion on M7 |
+| GPS-denied navigation | OpenVINS on i.MX95 feeds M7 PX4 through DDS. Two GPS-aiding-disabled tests completed 3 m takeoff, 10-second hover and landing; independent truth measured 3.6 cm maximum horizontal hover error on the recorded repeat | VIO height RMSE was 0.89 m; altitude still uses barometer. Qualify square flights, yaw, repeatability and localization-loss behavior |
 
 The five-bridge run passed the original 90% sustained-following requirement.
 Active following includes fresh observations and prediction bounded by age and
@@ -85,9 +85,16 @@ flowchart TD
     dds["Micro XRCE-DDS Agent<br/>Linux to M7 bridge"]
     px4["M7 PX4 / NuttX<br/>State estimation and flight control"]
 
+    sensors["VIO bench camera + IMU"]
+    vio["visual-odometry<br/>OpenVINS"]
+    adapter["px4-odometry<br/>Validate and convert"]
+
     source --> capture
     capture -->|H.264 / H.265 RTP| radio
     radio -->|Dedicated USB radios| receiver
+    sensors --> vio
+    vio -->|ROS Odometry| adapter
+    adapter -->|External vision| dds
     capture -->|ROS images| vision
     vision -->|Detections| tracker
     tracker -->|Tracked observations| guidance
@@ -97,18 +104,19 @@ flowchart TD
 
 Capture, inference, tracking and guidance run on i.MX95 Linux. PX4 owns aircraft
 state estimation and flight control on the M7. The diagram shows the current
-path. The separate `visual-odometry` evaluation service runs the upstream
-OpenVINS ROS 2 node with AirSim camera and IMU inputs. It publishes standard
-ROS odometry for comparison against independent ground truth. PX4 fusion and
-obstacle mapping are not yet implemented.
+path. The separate VIO bench path runs upstream OpenVINS with AirSim camera
+and IMU inputs. `px4-odometry` validates frame, covariance and timestamp data
+before forwarding measurements to M7 EKF2. Horizontal vision fusion has passed
+the short GPS-aiding-disabled hover tests; barometer and magnetometer remain
+active. Ground truth is used only for evaluation. Obstacle mapping remains open.
 
 ## Next milestones
 
 1. **GPS-denied simulation:** qualify OpenVINS initialization, drift and timing
-   on i.MX95 across more motion cases. The current tests use AirSim's internal
-   pilot; VIO has no flight-control authority. Then validate
-   external-odometry fusion on M7 PX4 with GPS aiding disabled: hover, square
-   flight, return and landing. Ground truth remains an evaluation reference.
+   on i.MX95 across more motion cases. Build on the M7 horizontal-fusion hover
+   baseline with square flights, yaw, return and landing. Resolve VIO height
+   drift before enabling vision height fusion. Ground truth remains an
+   evaluation reference.
 2. **Continuous following:** repeat the bounded-prediction and reacquisition
    tests across more speeds, appearances and occlusion lengths.
 3. **Obstacle-aware autonomy:** add depth-based local mapping and safe trajectory

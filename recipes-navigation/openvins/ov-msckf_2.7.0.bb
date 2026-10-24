@@ -26,6 +26,9 @@ SRC_URI += "\
     file://0004-bound-ros-executor-and-imu-history.patch;patchdir=.. \
     file://0005-own-asynchronous-imu-timestamp.patch;patchdir=.. \
     file://0006-separate-inertial-callback-group.patch;patchdir=.. \
+    file://0007-own-workers-and-ros-shutdown.patch;patchdir=.. \
+    file://0008-bound-optional-visualization.patch;patchdir=.. \
+    file://0009-publish-stationary-initialized-odometry.patch;patchdir=.. \
 "
 
 # Keep the feature-level simulator out of the normal runtime installation.

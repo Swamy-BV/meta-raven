@@ -43,6 +43,7 @@ IMAGE_INSTALL:append = " \
     target-tracker \
     guidance \
     visual-odometry \
+    px4-odometry \
 "
 
 # Publish a block map with the compressed factory WIC for bmaptool and UUU.
