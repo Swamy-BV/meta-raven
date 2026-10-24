@@ -167,7 +167,7 @@ class GuidanceNode final : public rclcpp::Node {
       labels_topic_;
   std::string selected_id_, selected_frame_, selected_class_, model_key_;
   std::string state_ = "idle";
-  std::string reason_ = "Select a visible person or car";
+  std::string reason_ = "Select a visible supported target";
   PredictionLimits prediction_limits_;
   double timeout_seconds_ = 0;
   double loss_timeout_seconds_ = 0;

@@ -41,7 +41,7 @@ void GuidanceNode::SelectTarget(const Select::Request& request,
         return detection.id == request.track_id && Supported(detection);
       });
   if (found == tracks_.detections.end()) {
-    response.message = "Person or car track is not visible";
+    response.message = "Supported target track is not visible";
     return;
   }
   motion_.Reset();

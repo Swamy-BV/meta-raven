@@ -64,6 +64,7 @@ class TrackingNode final : public rclcpp::Node {
   std::deque<sensor_msgs::msg::Image::ConstSharedPtr> frames_;
   std::string image_topic_, reid_model_;
   std::vector<std::string> vehicle_classes_;
+  std::vector<std::string> ground_classes_;
   std::size_t encoded_crops_ = 0;
   std::size_t missing_frames_ = 0;
   double reid_milliseconds_ = 0;

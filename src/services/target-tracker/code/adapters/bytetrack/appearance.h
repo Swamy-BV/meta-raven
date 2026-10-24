@@ -54,6 +54,16 @@ class AppearanceAssociation final {
     float iou_distance = 0;
   };
 
+  struct Evidence {
+    std::size_t input_index = 0;
+    float distance = 0;
+    bool grounded = false;
+    bool ambiguous = false;
+  };
+
+  void ApplyCandidate(const STrack& track, const Evidence& evidence,
+                      float& cost);
+
   [[nodiscard]] float AssociationCost(const STrack& track,
                                       const Candidate& candidate);
   [[nodiscard]] const Observation& Measurement(std::size_t index) const;
@@ -66,6 +76,9 @@ class AppearanceAssociation final {
                                  const Costs& proximity);
   [[nodiscard]] float CandidateDistance(const STrack& track,
                                         const Observation& observation) const;
+  [[nodiscard]] float GroundContinuity(const Gallery& gallery,
+                                       const Observation& observation) const;
+  void MeasureGroundContinuity(int identity, const Observation& observation);
   [[nodiscard]] bool RecoveryAllows(const STrack& track, const Box& box,
                                     float proximity) const;
   void ApplyRow(const std::vector<std::size_t>& indices,

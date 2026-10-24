@@ -27,6 +27,7 @@ namespace {
 constexpr auto kPoseQueueDepth = 16;
 constexpr auto kMaximumTopicLength = 256U;
 constexpr auto kPrincipalPointY = 5U;
+constexpr auto kMaximumGroundClasses = 16U;
 constexpr double kHalfTurnDegrees = 180;
 constexpr double kPi = 3.14159265358979323846;
 constexpr std::int64_t kNanosPerMicro = 1000;
@@ -74,6 +75,12 @@ void TrackingNode::ConfigureGround() {
   if (!encoder_) {
     throw std::invalid_argument(
         "Ground recovery requires a vehicle ReID model");
+  }
+  ground_classes_ = declare_parameter<std::vector<std::string>>(
+      "ground_classes", vehicle_classes_, options);
+  if (ground_classes_.empty() ||
+      ground_classes_.size() > kMaximumGroundClasses) {
+    throw std::invalid_argument("Invalid ground-association classes");
   }
   GroundCamera camera;
   camera.ground_z = declare_parameter<double>("ground_z", 0, options);
@@ -182,7 +189,8 @@ void TrackingNode::Locate(std::vector<Observation>& observations,
     return;
   }
   for (auto& observation : observations) {
-    if (!observation.appearance_subject) {
+    if (std::find(ground_classes_.begin(), ground_classes_.end(),
+                  observation.class_id) == ground_classes_.end()) {
       continue;
     }
     observation.ground_point =

@@ -77,6 +77,12 @@ bool Unique(const std::vector<std::vector<float>>& costs, std::size_t row,
   }
   return true;
 }
+
+bool IouOnly(const Observation& observation, const bool grounded) {
+  return observation.appearance.empty() &&
+         (observation.appearance_subject || !grounded);
+}
+
 }  // namespace
 
 AppearanceAssociation::AppearanceAssociation(bool ground_motion,
@@ -121,7 +127,13 @@ float AppearanceAssociation::Distance(
 float AppearanceAssociation::CandidateDistance(
     const STrack& track, const Observation& observation) const {
   const auto found = galleries_.find(track.track_id);
-  if (found == galleries_.end() || observation.appearance.empty()) {
+  if (found == galleries_.end()) {
+    return kRejected;
+  }
+  if (!observation.appearance_subject && observation.appearance.empty()) {
+    return GroundContinuity(found->second, observation);
+  }
+  if (observation.appearance.empty()) {
     return kRejected;
   }
   const auto appearance = Distance(found->second, observation.appearance);
@@ -142,6 +154,20 @@ float AppearanceAssociation::CandidateDistance(
             *motion);
   }
   return MotionAllows(track, observation.box) ? appearance : kRejected;
+}
+
+float AppearanceAssociation::GroundContinuity(
+    const Gallery& gallery, const Observation& observation) const {
+  // Geometry without a category-qualified embedding is continuity only, not
+  // long-gap ReID. The last matched measurement must be recent; the usual
+  // covariance and mutual-uniqueness gates still apply.
+  if (!observation.ground_point || !Grounded(gallery, observation) ||
+      stamp_ - gallery.seen > kContinuitySeconds) {
+    return kRejected;
+  }
+  const auto motion = gallery.ground.Distance(*observation.ground_point, stamp_,
+                                              kContinuitySeconds);
+  return motion ? kMaximumDistance * static_cast<float>(*motion) : kRejected;
 }
 
 bool AppearanceAssociation::RecoveryAllows(const STrack& track, const Box& box,
@@ -219,23 +245,41 @@ void AppearanceAssociation::ApplyRow(const std::vector<std::size_t>& indices,
   const bool recovering = track.state == TrackState::Lost;
   for (std::size_t column = 0; column < indices.size(); ++column) {
     const auto& measured = Measurement(indices[column]);
-    if (!recovering && measured.appearance.empty()) {
+    const auto grounded = Grounded(galleries_.at(track.track_id), measured);
+    if (!recovering && IouOnly(measured, grounded)) {
       continue;
     }
     const auto distance = appearance[row][column];
-    const auto grounded = Grounded(galleries_.at(track.track_id), measured);
     const auto ambiguous = distance <= kMaximumDistance &&
                            (recovering || grounded) &&
                            !Unique(appearance, row, column);
-    if (recovering && ambiguous) {
-      deferred_.insert(indices[column]);
+    ApplyCandidate(track, {indices[column], distance, grounded, ambiguous},
+                   costs[column]);
+  }
+}
+
+void AppearanceAssociation::ApplyCandidate(const STrack& track,
+                                           const Evidence& evidence,
+                                           float& cost) {
+  const bool recovering = track.state == TrackState::Lost;
+  if (recovering && evidence.ambiguous) {
+    deferred_.insert(evidence.input_index);
+  }
+  if (!Measurement(evidence.input_index).appearance_subject) {
+    // Geometry supplements the established image tracker for categories with
+    // no qualified embedding. Missing/ambiguous ground evidence cannot erase
+    // a valid image match; only fresh unique ground continuity can add one.
+    if (evidence.distance <= kMaximumDistance && !evidence.ambiguous) {
+      cost =
+          std::min(cost, kRecoveryCost * evidence.distance / kMaximumDistance);
     }
-    if (distance > kMaximumDistance || ambiguous) {
-      costs[column] = kRejected;
-      ++rejections_;
-    } else if (recovering || grounded) {
-      costs[column] = kRecoveryCost * distance / kMaximumDistance;
-    }
+    return;
+  }
+  if (evidence.distance > kMaximumDistance || evidence.ambiguous) {
+    cost = kRejected;
+    ++rejections_;
+  } else if (recovering || evidence.grounded) {
+    cost = kRecoveryCost * evidence.distance / kMaximumDistance;
   }
 }
 
@@ -260,6 +304,10 @@ void AppearanceAssociation::Refine(Costs& costs,
 void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
   const auto& measured = Measurement(index);
   measurements_.insert_or_assign(track.track_id, measured.box);
+  if (!measured.appearance_subject && measured.ground_point) {
+    MeasureGroundContinuity(track.track_id, measured);
+    return;
+  }
   auto found = galleries_.find(track.track_id);
   if (found != galleries_.end()) {
     if (stamp_ - found->second.seen > kContinuitySeconds &&
@@ -290,6 +338,23 @@ void AppearanceAssociation::Measured(const STrack& track, std::size_t index) {
     gallery.descriptors.pop_front();
   }
   gallery.updated = stamp_;
+}
+
+void AppearanceAssociation::MeasureGroundContinuity(
+    const int identity, const Observation& observation) {
+  if (!observation.ground_point ||
+      (observation.score < kMinimumScore && galleries_.count(identity) == 0)) {
+    return;
+  }
+  auto& gallery = galleries_[identity];
+  // ByteTrack's weak-detection stage may maintain a confirmed identity. It
+  // cannot initialize one; every update remains measurement-backed and gated.
+  if (!gallery.ground.Observe(*observation.ground_point, stamp_, retention_)) {
+    return;
+  }
+  gallery.seen = stamp_;
+  gallery.updated = stamp_;
+  gallery.observed_box = observation.box;
 }
 
 std::function<bool(std::size_t)> AppearanceAssociation::Initialization() {

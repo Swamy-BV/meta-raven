@@ -105,7 +105,8 @@ void GuidanceNode::ReceiveLabels(const vision_msgs::msg::LabelInfo& message) {
   }
   supported_classes_.clear();
   for (const auto& label : message.class_map) {
-    if (label.class_name == "person" || label.class_name == "car") {
+    if (label.class_name == "person" || label.class_name == "bicycle" ||
+        label.class_name == "car") {
       supported_classes_.insert(std::to_string(label.class_id));
     }
   }
