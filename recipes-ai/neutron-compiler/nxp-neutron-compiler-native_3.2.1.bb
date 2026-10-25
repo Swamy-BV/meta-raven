@@ -6,7 +6,6 @@ SECTION = "devel"
 LICENSE = "Proprietary"
 NXP_LICENSE_DIR = "eiq_neutron_sdk-${PV}.dist-info/licenses"
 LIC_FILES_CHKSUM = "file://${NXP_LICENSE_DIR}/LA_OPT_NXP_Software_License.txt;md5=dad891a0e1a4cffc85a3bddb7d40414a"
-NO_GENERIC_LICENSE[Proprietary] = "${NXP_LICENSE_DIR}/LA_OPT_NXP_Software_License.txt"
 
 DEPENDS = "zlib-native"
 

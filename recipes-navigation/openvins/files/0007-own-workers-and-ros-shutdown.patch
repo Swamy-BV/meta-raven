@@ -219,7 +219,7 @@ Signed-off-by: Raven Contributors <raven@localhost>
  #endif
  
    // Final visualization
-@@ -124,5 +127,9 @@
+@@ -124,7 +127,11 @@
  #if ROS_AVAILABLE == 1
    ros::shutdown();
  #elif ROS_AVAILABLE == 2
@@ -229,3 +229,5 @@ Signed-off-by: Raven Contributors <raven@localhost>
 +  node.reset();
    rclcpp::shutdown();
  #endif
+ 
+   // Done!
