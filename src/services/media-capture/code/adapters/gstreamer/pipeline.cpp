@@ -2,6 +2,7 @@
 
 #include "pipeline.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <stdexcept>
@@ -58,7 +59,12 @@ std::string SourceGraph(const Settings& settings) {
     if (!source.camera_name.empty()) {
       graph += " camera-name=" + Quote(source.camera_name);
     }
-    graph += " ! video/x-raw,format=NV12";
+    // Request the sensor rate explicitly; videorate only drops downstream
+    // frames.
+    const auto fps = std::max(
+        {settings.image.fps, settings.preview.fps, settings.video.fps});
+    graph +=
+        " ! video/x-raw,format=NV12,framerate=" + std::to_string(fps) + "/1";
     if (source.width > 0 && source.height > 0) {
       graph += ",width=" + std::to_string(source.width) +
                ",height=" + std::to_string(source.height);

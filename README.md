@@ -33,9 +33,9 @@ and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
   hardware-encoded 1280 x 720 browser video have been tested. ROS applications
   and MAVLink camera commands use the same capture operations. Hardware H.264
   (default) and H.265 are selectable; both reached a laptop over WFB-ng at
-  720p/15 fps. Native 1080p capture at 30 fps has also been tested with NXP's
+  720p/15 fps. Native 1080p capture at 50 fps has also been tested with NXP's
   open Neo IPA; native capture, photos, preview and recording now default to
-  1080p, with preview and recording configured for 30 fps. Dedicated USB radio
+  1080p, with preview and recording configured for 50 fps. Dedicated USB radio
   drivers are separate from the NXP kernel.
 - **Edge vision:** `vision-engine` publishes standard ROS vision outputs.
   YOLOv8s detection and PP-LCNet vehicle appearance embeddings have run on the
@@ -57,7 +57,7 @@ bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
-| WFB-ng video | RTL8812AU pair: hardware H.264 at 1080p/30 decoded at 29.6 fps over 32 seconds. H.264 and H.265 also passed earlier 720p/15 tests, about 2 Mbit/s; H.265 onboard recording and ROS images/status verified | Qualify sustained 1080p delivery, packet-delay spikes and loss on the USBIP/WSL bench; measure glass-to-glass latency and range |
+| WFB-ng video | RTL8812AU pair: hardware H.264 at 1080p/50 decoded at 49.98 fps over 32 seconds after SWUpdate and reboot. Board CPU averaged 14.9% of six-core capacity. H.265 passed earlier 720p/15 streaming and onboard recording tests | Qualify longer 1080p/50 runs, H.265/50, image quality, packet delay and loss; measure glass-to-glass latency and range |
 | WFB-ng telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
 | OpenHD (optional) | IMX477 native 1920 x 1080 measured 30.01 fps using NXP open Neo IPA. Hardware H.264 at 720p/30 decoded at 27.1 fps over a 68-second radio run; board CPU averaged 14.4% of six-core capacity. Concurrent telemetry returned 28/30 information responses and 13/15 pings (4.6 ms median RTT). Photo capture and video start/stop commands passed over radio | Resolve radio delivery gaps and intermittent telemetry loss; qualify image quality, glass-to-glass latency, H.265 and range |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
@@ -159,10 +159,12 @@ The IMX477 driver exposes an ISP-aligned native 1920 x 1080 mode alongside
 its existing 4K mode. The 1080p/30 bench used
 `LIBCAMERA_IPA_MODULE_PATH=/usr/lib/libcamera/ipa` to select NXP's open Neo IPA;
 NXP's supplied Uguzzi tuning database only contains a 3840 x 2160 profile.
-The FRDM default is native 1080p with the open Neo IPA, including 1080p/30
+The FRDM default is native 1080p with the open Neo IPA, including 1080p/50
 preview and recording. The 4K sensor mode remains available with the matching
-Uguzzi IPA configuration. Hardware ISP processing,
-G2D scaling and hardware video encoding remain in use. ROS images and CameraInfo
+Uguzzi IPA configuration and the previously tested 15 fps video profiles.
+Sensor timestamps verified 49.99 fps and a 30/50/default rate-switch sequence.
+Hardware ISP processing, G2D scaling and hardware video encoding remain in use.
+ROS images and CameraInfo
 were verified at 640 x 360/15 fps; calibration is still unavailable.
 
 OpenHD and WFB-ng need matching air/ground software and their own pairing keys.
