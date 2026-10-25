@@ -5,6 +5,7 @@ FILESEXTRAPATHS:prepend:raven-frdm-imx95 := "${THISDIR}/files:"
 SRC_URI:append:raven-frdm-imx95 = " \
     file://0001-nxp-imx477-isp.patch \
     file://0002-reap-owned-ipa-workers.patch \
+    file://0003-neo-frame-duration-limits.patch \
 "
 
 # Stage before patch/configure, rather than modifying sources during compilation.

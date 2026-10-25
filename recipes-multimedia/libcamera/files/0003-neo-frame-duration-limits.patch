@@ -1,0 +1,279 @@
+Subject: [PATCH] ipa: nxp: neo: apply requested sensor frame durations
+
+The open Neo IPA advertises FrameDurationLimits but does not apply it to
+sensor blanking or exposure. A 1080p50 request consequently stays at the
+sensor default of 30 fps despite negotiating 50 fps GStreamer caps.
+
+Retain frame-duration requests per frame, clamp them to sensor timing
+limits, bound AGC and manual exposure, and send VBLANK through the existing
+sensor-control path. Register VBLANK with the existing delayed-control
+handler using the sensor properties, and apply it before exposure controls.
+Report the delayed sensor blanking in metadata. Carry camera startup
+controls into the first IPA request, preserving per-request overrides.
+Zero duration values retain the mode defaults. Keep hardware ISP processing.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+---
+--- a/src/ipa/nxp/neo/ipa_context.h
++++ b/src/ipa/nxp/neo/ipa_context.h
+@@ -93,6 +93,9 @@
+ 		double defAnalogueGain;
+ 
+ 		int32_t defVBlank;
++		int32_t minVBlank;
++		int32_t maxVBlank;
++		uint32_t exposureMargin;
+ 		utils::Duration lineDuration;
+ 		Size size;
+ 		/* bpp per ISP input */
+@@ -111,6 +114,11 @@
+ };
+ 
+ struct IPAActiveState {
++	struct {
++		uint32_t minFrameLength;
++		uint32_t maxFrameLength;
++	} frameDuration;
++
+ 	struct {
+ 		controls::AfModeEnum mode;
+ 		std::optional<int32_t> hwPosition;
+@@ -165,6 +173,11 @@
+ 
+ struct IPAFrameContext : public FrameContext {
+ 	struct {
++		uint32_t minFrameLength;
++		uint32_t maxFrameLength;
++	} frameDuration;
++
++	struct {
+ 		/* User control updates. */
+ 		std::optional<controls::AfModeEnum> mode;
+ 		std::optional<controls::AfRangeEnum> range;
+@@ -210,6 +223,7 @@
+ 		RGB<double> wbGains;
+ 		ControlList mdControls;
+ 		bool metaDataValid;
++		int32_t vblank;
+ 	} sensor;
+ 
+ 	struct {
+--- a/src/ipa/nxp/neo/neo_ipa.cpp
++++ b/src/ipa/nxp/neo/neo_ipa.cpp
+@@ -465,6 +465,11 @@
+ 		context_.camHelper->sensorControlsToMetaData(&sensorControls, &mdControls);
+ 	}
+ 
++	/* VBLANK follows the same delayed-control path as exposure and gain. */
++	frameContext.sensor.vblank = sensorControls.contains(V4L2_CID_VBLANK)
++		? sensorControls.get(V4L2_CID_VBLANK).get<int32_t>()
++		: context_.configuration.sensor.defVBlank;
++
+ 	/* Update frame context with the sensor metadata */
+ 	updateFrameContextSensorMeta(frame, context);
+ 
+@@ -546,9 +551,18 @@
+ 
+ 	/* Update IPA context with sensor vblank, output size and line duration. */
+ 	context_.configuration.sensor.defVBlank = v4l2VBlank.def().get<int32_t>();
++	context_.configuration.sensor.minVBlank = v4l2VBlank.min().get<int32_t>();
++	context_.configuration.sensor.maxVBlank = v4l2VBlank.max().get<int32_t>();
+ 	context_.configuration.sensor.size = sensorInfo.outputSize;
+ 	context_.configuration.sensor.lineDuration = context_.camHelper->hblankToLineLength(
+ 		cameraMode.hblank);
++
++	/* Preserve the sensor's integration margin when shortening a frame. */
++	const auto &sensor = context_.configuration.sensor;
++	const uint32_t frameLength = sensor.size.height + sensor.defVBlank;
++	const uint32_t exposureLines = vMaxExposure[0] / sensor.lineDuration;
++	context_.configuration.sensor.exposureMargin =
++		frameLength > exposureLines ? frameLength - exposureLines : 0;
+ }
+ 
+ void IPANxpNeo::updateControls(const IPACameraSensorInfo &sensorInfo,
+@@ -748,6 +762,15 @@
+ 		}
+ 	}
+ 
++	/* Bound frame length by the request, allowing exposure within that interval. */
++	uint32_t frameLength = frameContext.frameDuration.minFrameLength;
++	for (const auto &[id, agc] : frameContext.agcs)
++		frameLength = std::max(frameLength, agc.exposure +
++				     context_.configuration.sensor.exposureMargin);
++	frameLength = std::min(frameLength, frameContext.frameDuration.maxFrameLength);
++	ctrls.set(V4L2_CID_VBLANK, static_cast<int32_t>(frameLength -
++		  context_.configuration.sensor.size.height));
++
+ 	LOG(NxpNeoControlList, Debug)
+ 		<< "Controls update: { frame = " << frame << " }, "
+ 		<< logControlList(&ctrls);
+--- a/src/ipa/nxp/neo/algorithms/agc.h
++++ b/src/ipa/nxp/neo/algorithms/agc.h
+@@ -125,6 +125,8 @@
+ 		     ControlList &metadata) override;
+ 
+ private:
++	void queueFrameDuration(IPAContext &context, IPAFrameContext &frameContext,
++				const ControlList &controls);
+ 	void fillMetadata(IPAContext &context, IPAFrameContext &frameContext,
+ 			  ControlList &metadata) const;
+ 	std::map<IPACameraContext, std::unique_ptr<AgcStats>> agcs_;
+--- a/src/ipa/nxp/neo/algorithms/agc.cpp
++++ b/src/ipa/nxp/neo/algorithms/agc.cpp
+@@ -120,6 +120,10 @@
+ 	context.configuration.agc.roi.width = configInfo.outputSize.width;
+ 	context.configuration.agc.roi.height = configInfo.outputSize.height;
+ 
++	const auto &sensor = context.configuration.sensor;
++	const uint32_t frameLength = sensor.size.height + sensor.defVBlank;
++	context.activeState.frameDuration = { frameLength, frameLength };
++
+ 	for (const auto &ctxt : context.configuration.activeContexts) {
+ 		context.activeState.agcs[ctxt] = {};
+ 		agcs_[ctxt]->configure(context);
+@@ -147,6 +151,8 @@
+ 	 * Initialize autoEnabled with any context, it is the same
+ 	 * for both of them.
+ 	 */
++	queueFrameDuration(context, frameContext, controls);
++
+ 	bool autoEnabled =
+ 		context.activeState.agcs.at(IPACameraContext::Rgb).autoEnabled;
+ 
+@@ -188,6 +194,29 @@
+ 	}
+ }
+ 
++/* Convert duration requests to sensor lines without exceeding sensor limits. */
++void Agc::queueFrameDuration(IPAContext &context, IPAFrameContext &frameContext,
++			     const ControlList &controls)
++{
++	const auto &sensor = context.configuration.sensor;
++	auto &active = context.activeState.frameDuration;
++	const auto &limits = controls.get(controls::FrameDurationLimits);
++	if (limits) {
++		const auto frameLength = [&sensor](int64_t duration) {
++			if (!duration)
++				return sensor.size.height + sensor.defVBlank;
++			double lines = std::ceil(duration * 1.0us / sensor.lineDuration);
++			return static_cast<uint32_t>(std::clamp(lines,
++				static_cast<double>(sensor.size.height + sensor.minVBlank),
++				static_cast<double>(sensor.size.height + sensor.maxVBlank)));
++		};
++		active.minFrameLength = frameLength(limits->front());
++		active.maxFrameLength = std::max(active.minFrameLength,
++					       frameLength(limits->back()));
++	}
++	frameContext.frameDuration = { active.minFrameLength, active.maxFrameLength };
++}
++
+ /**
+  * \copydoc libcamera::ipa::Algorithm::prepare
+  */
+@@ -202,6 +231,11 @@
+ 		agcFrameContext.exposure = agcActiveState.exposure;
+ 		agcFrameContext.gain = agcActiveState.gain;
+ 	}
++
++	/* Manual and automatic integration must fit the requested maximum frame. */
++	agcFrameContext.exposure = std::min(agcFrameContext.exposure,
++		frameContext.frameDuration.maxFrameLength -
++		context.configuration.sensor.exposureMargin);
+ 
+ 	if (frame > 0 && !frameContext.hdr.update)
+ 		return;
+@@ -225,9 +259,9 @@
+ 	auto &agcFrameContext = frameContext.agcs.at(frameContext.cameraContext);
+ 	metadata.set(controls::AeEnable, agcFrameContext.autoEnabled);
+ 
+-	/* \todo Use VBlank value calculated from each frame exposure. */
++	/* Report delayed sensor timing, rather than the mode's default duration. */
+ 	uint32_t vTotal = context.configuration.sensor.size.height +
+-			  context.configuration.sensor.defVBlank;
++			  frameContext.sensor.vblank;
+ 	utils::Duration frameDuration = context.configuration.sensor.lineDuration *
+ 					vTotal;
+ 	metadata.set(controls::FrameDuration, frameDuration.get<std::micro>());
+@@ -270,6 +304,13 @@
+ 	utils::Duration newExposureTime;
+ 	double aGain, qGain, dGain;
+ 	auto &agcActiveState = context.activeState.agcs.at(cameraContext);
++
++	const auto &sensor = context.configuration.sensor;
++	const utils::Duration frameExposure = sensor.lineDuration *
++		(frameContext.frameDuration.maxFrameLength - sensor.exposureMargin);
++	const auto maximumExposure = std::min(sensor.maxExposureTime, frameExposure);
++	agcs_[cameraContext]->setLimits(sensor.minExposureTime, maximumExposure,
++				       sensor.minAnalogueGain, sensor.maxAnalogueGain, {});
+ 
+ 	std::tie(newExposureTime, aGain, qGain, dGain) =
+ 		agcs_[cameraContext]->AgcMeanLuminance::calculateNewEv(
+@@ -323,7 +364,7 @@
+ 		static_cast<controls::AeExposureModeEnum>(
+ 			exposureModeHelpers().begin()->first);
+ 
+-	/* \todo Run this again when FrameDurationLimits is passed in */
++	/* Initial limits; request-specific frame limits are applied in process(). */
+ 	setLimits(context.configuration.sensor.minExposureTime,
+ 		  context.configuration.sensor.maxExposureTime,
+ 		  context.configuration.sensor.minAnalogueGain,
+--- a/src/libcamera/pipeline/nxp/neo/neo_pipeline.cpp
++++ b/src/libcamera/pipeline/nxp/neo/neo_pipeline.cpp
+@@ -428,6 +428,7 @@
+ 
+ 	std::unique_ptr<ipa::nxpneo::IPAProxyNxpNeo> ipa_;
+ 	ControlInfoMap ipaControls_;
++	ControlList startControls_;
+ 	std::vector<IPABuffer> ipaBuffers_;
+ 	std::unique_ptr<DelayedControls> delayedCtrls_;
+ 
+@@ -1874,12 +1875,13 @@
+ 	return -EINVAL;
+ }
+ 
+-int NxpNeoCameraData::start([[maybe_unused]] const ControlList *controls)
++int NxpNeoCameraData::start(const ControlList *controls)
+ {
+ 	int ret;
+ 
+ 	LOG(NxpNeoPipe, Debug) << "Start " << cameraName();
+ 	sequence_ = 0;
++	startControls_ = controls ? *controls : ControlList{};
+ 
+ 	/* Allocate buffers for internal pipeline usage. */
+ 	ret = allocateBuffers();
+@@ -1997,8 +1999,17 @@
+ 		return -EIO;
+ 	}
+ 
+-	if (isRawCamera())
+-		ipa_->queueRequest(info->id_, request->controls());
++	if (isRawCamera()) {
++		if (startControls_.empty()) {
++			ipa_->queueRequest(info->id_, request->controls());
++		} else {
++			/* Per-request controls take precedence over startup defaults. */
++			ControlList controls = request->controls();
++			controls.merge(startControls_, ControlList::MergePolicy::KeepExisting);
++			ipa_->queueRequest(info->id_, controls);
++			startControls_.clear();
++		}
++	}
+ 
+ 	return 0;
+ }
+@@ -2255,6 +2266,13 @@
+ 		};
+ 	}
+ 
++	/* Frame duration controls need the same sensor-delay tracking as exposure. */
++	if (sensor->controls().find(V4L2_CID_VBLANK) != sensor->controls().end()) {
++		const auto &delays = sensor->sensorDelays();
++		delayedControlsParams.try_emplace(V4L2_CID_VBLANK,
++			DelayedControls::ControlParams{ delays.vblankDelay, true });
++	}
++
+ 	V4L2Subdevice *subdev = sensor->device();
+ 	if (subdev) {
+ 		delayedCtrls_ = std::make_unique<DelayedControls>(
