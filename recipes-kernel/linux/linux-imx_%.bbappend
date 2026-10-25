@@ -17,6 +17,7 @@ require recipes-multimedia/imx477/imx477-source.inc
 SRC_URI:append:raven-frdm-imx95 = " \
     file://0003-nxp-imx477-camera.patch \
     file://0004-raven-m7-ownership-and-camera-tree.patch \
+    file://0005-imx477-advertise-sensor-modes.patch;apply=no \
     file://raven-camera.cfg \
 "
 
@@ -24,3 +25,10 @@ IMX477_STAGE_FILES:raven-frdm-imx95 = "\
     linux-imx/imx477.c:drivers/media/i2c/imx477.c \
     linux-imx/imx95-15x15-frdm-imx477.dtso:arch/arm64/boot/dts/freescale/imx95-15x15-frdm-imx477.dtso \
 "
+
+# The imported camera-pack driver is outside the kernel Git index. Apply its
+# patch after the kernel Git patch queue, using the staged source as the base.
+do_patch:append:raven-frdm-imx95() {
+    patch --batch --fuzz=0 --no-backup-if-mismatch -p1 -d "${S}" \
+        -i "${UNPACKDIR}/0005-imx477-advertise-sensor-modes.patch"
+}

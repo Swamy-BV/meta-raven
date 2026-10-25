@@ -1,0 +1,72 @@
+Subject: [PATCH] media: imx477: expose an ISP-aligned 1080p sensor mode
+
+NXP limits the 12-bit mode list to the default 4K mode. Expose the complete
+mode table so applications can select the lower-resolution readout.
+
+The Neo ISP requires a width divisible by 16 and filters out the original
+2028x1080 mode. Set the sensor's X_OUT_SIZE register to 1920 and describe
+that output width in the mode table. Keep the existing binned 1080-line
+readout, PLL settings, line length and frame timing. The original 4K mode
+remains the default. This reduces the sensor output itself rather than
+scaling a 4K capture downstream.
+
+Upstream-Status: Pending
+---
+--- a/drivers/media/i2c/imx477.c
++++ b/drivers/media/i2c/imx477.c
+@@ -816,7 +816,7 @@
+ };
+ 
+ /* 1080p cropped mode */
+-static const struct imx477_reg mode_2028x1080_regs[] = {
++static const struct imx477_reg mode_1920x1080_regs[] = {
+ 	{0x0342, 0x31},
+ 	{0x0343, 0xc4},
+ 	{0x0344, 0x00},
+@@ -871,7 +871,7 @@
+ 	{0x040e, 0x04},
+ 	{0x040f, 0x38},
+ 	{0x034c, 0x07},
+-	{0x034d, 0xec},
++	{0x034d, 0x80},
+ 	{0x034e, 0x04},
+ 	{0x034f, 0x38},
+ 	{0x0301, 0x05},
+@@ -1095,13 +1095,13 @@
+ 	},
+ 	{
+ 		/* 1080p 50fps cropped mode */
+-		.width = 2028,
++		.width = 1920,
+ 		.height = 1080,
+ 		.line_length_pix = 0x31c4,
+ 		.crop = {
+ 			.left = IMX477_PIXEL_ARRAY_LEFT,
+ 			.top = IMX477_PIXEL_ARRAY_TOP + 440,
+-			.width = 2028,
++			.width = 1920,
+ 			.height = 1080,
+ 		},
+ 		.timeperframe_min = {
+@@ -1113,8 +1113,8 @@
+ 			.denominator = 3000
+ 		},
+ 		.reg_list = {
+-			.num_of_regs = ARRAY_SIZE(mode_2028x1080_regs),
+-			.regs = mode_2028x1080_regs,
++			.num_of_regs = ARRAY_SIZE(mode_1920x1080_regs),
++			.regs = mode_1920x1080_regs,
+ 		},
+ 	}
+ };
+@@ -1214,9 +1214,7 @@
+ 	case MEDIA_BUS_FMT_SGBRG12_1X12:
+ 	case MEDIA_BUS_FMT_SBGGR12_1X12:
+ 		*mode_list = supported_modes_12bit;
+-		/* Appears like libcamera always select the hight resolution
+-			So, linit the array size to choose specific resolution */
+-		*num_modes = MODE_DEFAULT + 1 ; //ARRAY_SIZE(supported_modes_12bit);
++		*num_modes = ARRAY_SIZE(supported_modes_12bit);
+ 		break;
+ 	/* 10-bit */
+ 	case MEDIA_BUS_FMT_SRGGB10_1X10:

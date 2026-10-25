@@ -33,7 +33,8 @@ and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
   hardware-encoded 1280 x 720 browser video have been tested. ROS applications
   and MAVLink camera commands use the same capture operations. Hardware H.264
   (default) and H.265 are selectable; both reached a laptop over WFB-ng at
-  720p/15 fps. Dedicated USB radio drivers are separate from the NXP kernel.
+  720p/15 fps. Native 1080p capture at 30 fps has also been tested with NXP's
+  open Neo IPA. Dedicated USB radio drivers are separate from the NXP kernel.
 - **Edge vision:** `vision-engine` publishes standard ROS vision outputs.
   YOLOv8s detection and PP-LCNet vehicle appearance embeddings have run on the
   Neutron NPU. CPU work remains for preprocessing, association, ROS and guidance;
@@ -56,7 +57,7 @@ bring-up results, not physical flight qualification.
 | --- | --- | --- |
 | WFB-ng video | RTL8812AU pair: hardware H.264 and H.265 at 720p/15 fps, about 2 Mbit/s; received recordings decoded, H.265 onboard recording and ROS images/status verified. Normal board CPU was about 14% of six-core capacity with existing services running | Reduce packet-delay spikes (271–293 ms p95) and 0.7–0.9% packet loss on the USBIP/WSL bench; measure glass-to-glass latency and range |
 | WFB-ng telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
-| OpenHD (optional) | Hardware H.264 camera video decoded at 14.8 fps; a 720p/30 fps test pattern passed at 30.0 fps through the hardware encoder and radio. PX4 and Linux camera MAVLink verified concurrently | Camera capture still runs near 15 fps; lower-resolution modes fail negotiation. Intermittent telemetry loss remains despite retries. Camera 30 fps, H.265 and range qualification pending |
+| OpenHD (optional) | IMX477 native 1920 x 1080 measured 30.01 fps using NXP open Neo IPA. Hardware H.264 at 720p/30 decoded at 27.1 fps over a 68-second radio run; board CPU averaged 14.4% of six-core capacity. Concurrent telemetry returned 28/30 information responses and 13/15 pings (4.6 ms median RTT). Photo capture and video start/stop commands passed over radio | Resolve radio delivery gaps and intermittent telemetry loss; qualify image quality, glass-to-glass latency, H.265 and range |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |
 | Bridge recovery | Five-bridge, six-car test passed: same selected identity recovered after every bridge; **92%** active following across the 61-second moving window | Repeat across speeds and viewpoints; qualify longer occlusions |
 | City following | About 140 seconds of moving-target following among 21 vehicles with M7 PX4; target-loss hold, landing and disarm after overshoot | Three-minute test did not pass; improve braking, minimum stand-off and tight-turn speed control |
@@ -151,6 +152,14 @@ are opt-in. Start `openhd@<interface>` only on the dedicated USB radio; configur
 media-capture with the additional `/usr/share/openhd/media-capture.yaml` profile
 and start streaming through its existing controls. MAVLink uses the existing
 router; the M7 DDS connection stays separate.
+
+The IMX477 driver exposes an ISP-aligned native 1920 x 1080 mode alongside
+its existing 4K mode. The 1080p/30 bench used
+`LIBCAMERA_IPA_MODULE_PATH=/usr/lib/libcamera/ipa` to select NXP's open Neo IPA;
+NXP's supplied Uguzzi tuning database only contains a 3840 x 2160 profile.
+The default 4K/Uguzzi capture configuration is unchanged. Hardware ISP processing,
+G2D scaling and hardware video encoding remain in use. ROS images and CameraInfo
+were verified at 640 x 360/15 fps; calibration is still unavailable.
 
 OpenHD and WFB-ng need matching air/ground software and their own pairing keys.
 Do not run them together on the same radio. External encoder bitrate remains
