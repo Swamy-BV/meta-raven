@@ -2,21 +2,21 @@
   ros__parameters:
     source: libcamera
     converter: g2d
-    source_width: 3840
-    source_height: 2160
+    source_width: 1920
+    source_height: 1080
     optical_frame: camera_optical_frame
     mode: video
-    photo_width: 3840
-    photo_height: 2160
+    photo_width: 1920
+    photo_height: 1080
     photo_quality: 90
-    preview_width: 1280
-    preview_height: 720
-    preview_fps: 15
+    preview_width: 1920
+    preview_height: 1080
+    preview_fps: 30
     preview_codec: h264
     preview_bitrate_kbps: 2000
-    video_width: 1280
-    video_height: 720
-    video_fps: 15
+    video_width: 1920
+    video_height: 1080
+    video_fps: 30
     video_codec: h264
     video_bitrate_kbps: 2000
     ros_width: 640
