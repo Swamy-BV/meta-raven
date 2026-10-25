@@ -7,12 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "../core/frame.h"
 #include "../core/result.h"
-#include <raven/contracts/camera.h>
 
 namespace raven::vision {
-// The provider returns an owned, latest frame on the application thread.
-using FrameProvider = std::function<raven::contracts::CameraFrame()>;
+// The provider returns a retained, immutable latest frame on the application
+// thread.
+using FrameProvider = std::function<Frame()>;
 
 class Engine final {
  public:

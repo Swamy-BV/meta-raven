@@ -39,8 +39,30 @@ constexpr std::array<float, kChannels> kMean = {0.485F, 0.456F, 0.406F};
 constexpr std::array<float, kChannels> kStddev = {0.229F, 0.224F, 0.225F};
 using Pixbuf = std::unique_ptr<GdkPixbuf, decltype(&g_object_unref)>;
 
-std::vector<std::int8_t> Input(const RgbFrame& frame, const Box& box,
-                               TfLiteQuantizationParams quantization) {
+constexpr std::size_t kByteValues = 256;
+using QuantizationTable =
+    std::array<std::array<std::int8_t, kByteValues>, kChannels>;
+
+QuantizationTable MakeQuantizationTable(TfLiteQuantizationParams quantization) {
+  QuantizationTable table{};
+  // Identical normalization, rounding and saturation to the per-pixel path.
+  // Quantization is fixed for the lifetime of this interpreter.
+  for (std::size_t channel = 0; channel < kChannels; ++channel) {
+    for (std::size_t pixel = 0; pixel < kByteValues; ++pixel) {
+      const auto value =
+          (static_cast<float>(pixel) / kPixelRange - kMean[channel]) /
+          kStddev[channel];
+      const auto quantized = std::round(value / quantization.scale) +
+                             static_cast<float>(quantization.zero_point);
+      table[channel][pixel] = static_cast<std::int8_t>(
+          std::clamp(quantized, kInt8Minimum, kInt8Maximum));
+    }
+  }
+  return table;
+}
+
+bool Input(const RgbFrame& frame, const Box& box,
+           const QuantizationTable& table, TfLiteTensor* tensor) {
   if (frame.data == nullptr || frame.width <= 0 || frame.height <= 0 ||
       frame.width > kMaximumDimension || frame.height > kMaximumDimension ||
       frame.stride < frame.width * kChannels ||
@@ -63,7 +85,7 @@ std::vector<std::int8_t> Input(const RgbFrame& frame, const Box& box,
       std::ceil(std::clamp(box.center_y + box.height * kHalf, top,
                            static_cast<double>(frame.height))));
   if (right - x < kMinimumCrop || bottom - y < kMinimumCrop) {
-    return {};
+    return false;
   }
   const Pixbuf source(
       gdk_pixbuf_new_from_data(frame.data, GDK_COLORSPACE_RGB, false,
@@ -86,22 +108,19 @@ std::vector<std::int8_t> Input(const RgbFrame& frame, const Box& box,
   }
   const auto* pixels = gdk_pixbuf_read_pixels(scaled.get());
   const int stride = gdk_pixbuf_get_rowstride(scaled.get());
-  std::vector<std::int8_t> result(static_cast<std::size_t>(kWidth) * kHeight *
-                                  kChannels);
+  constexpr auto kInputBytes =
+      static_cast<std::size_t>(kWidth) * kHeight * kChannels;
+  auto* target = static_cast<std::int8_t*>(TfLiteTensorData(tensor));
+  if (target == nullptr || TfLiteTensorByteSize(tensor) != kInputBytes) {
+    throw std::runtime_error("vehicle ReID input is not host accessible");
+  }
   for (int row = 0; row < kHeight; ++row) {
     for (int column = 0; column < kWidth * kChannels; ++column) {
-      const auto channel = column % kChannels;
-      const auto value =
-          (static_cast<float>(pixels[row * stride + column]) / kPixelRange -
-           kMean[channel]) /
-          kStddev[channel];
-      const auto quantized = std::round(value / quantization.scale) +
-                             static_cast<float>(quantization.zero_point);
-      result[row * kWidth * kChannels + column] = static_cast<std::int8_t>(
-          std::clamp(quantized, kInt8Minimum, kInt8Maximum));
+      target[row * kWidth * kChannels + column] =
+          table[column % kChannels][pixels[row * stride + column]];
     }
   }
-  return result;
+  return true;
 }
 
 bool Shape(const TfLiteTensor* tensor, const std::vector<int>& shape) {
@@ -147,6 +166,8 @@ class VehicleEncoder::Impl {
         !Shape(output_, {1, kDescriptorSize})) {
       throw std::runtime_error("incompatible vehicle ReID tensor contract");
     }
+    quantization_ =
+        MakeQuantizationTable(TfLiteTensorQuantizationParams(input_));
   }
 
   std::vector<float> Encode(const RgbFrame& frame, const Box& box);
@@ -160,6 +181,7 @@ class VehicleEncoder::Impl {
       options_;
   std::unique_ptr<TfLiteInterpreter, decltype(&TfLiteInterpreterDelete)>
       interpreter_;
+  QuantizationTable quantization_{};
   TfLiteTensor* input_ = nullptr;
   const TfLiteTensor* output_ = nullptr;
 };
@@ -167,13 +189,10 @@ class VehicleEncoder::Impl {
 std::vector<float> VehicleEncoder::Impl::Encode(const RgbFrame& frame,
                                                 const Box& box) {
   const auto start = std::chrono::steady_clock::now();
-  const auto input = Input(frame, box, TfLiteTensorQuantizationParams(input_));
-  if (input.empty()) {
+  if (!Input(frame, box, quantization_, input_)) {
     return {};
   }
-  if (TfLiteTensorCopyFromBuffer(input_, input.data(), input.size()) !=
-          kTfLiteOk ||
-      TfLiteInterpreterInvoke(interpreter_.get()) != kTfLiteOk) {
+  if (TfLiteInterpreterInvoke(interpreter_.get()) != kTfLiteOk) {
     throw std::runtime_error("vehicle ReID NPU invocation failed");
   }
   std::array<std::int8_t, kDescriptorSize> encoded{};

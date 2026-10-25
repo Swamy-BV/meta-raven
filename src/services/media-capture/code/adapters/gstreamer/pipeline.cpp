@@ -124,18 +124,22 @@ std::string VideoGraph(const Settings& settings,
       " source." + Queue() +
       "videorate drop-only=true ! video/x-raw(ANY),framerate=" +
       std::to_string(profile.fps) + "/1 ! " +
-      Convert(settings, profile, "NV12") + " ! v4l2" + codec + "enc" +
+      Convert(settings, profile, "NV12") + " ! v4l2" + codec +
+      "enc name=video_encoder" +
+      // Import the decoder/G2D DMA buffer instead of copying full NV12 frames
+      // into the encoder's default MMAP pool. Software sources keep auto I/O.
+      (settings.converter == "g2d" ? " output-io-mode=dmabuf-import" : "") +
       " extra-controls=" +
       Quote("encode,video_bitrate=" +
             std::to_string(profile.bitrate_kbps * kBitsPerKbit)) +
       " ! " + encoded_caps + ",profile=" + codec_profile + " ! " + codec +
-      "parse ! " + encoded_caps +
+      "parse name=video_parser ! " + encoded_caps +
       ",alignment=au ! tee name=encoded "
       "encoded. ! queue max-size-buffers=4 max-size-bytes=0 max-size-time=0 "
       "! " +
       "valve name=stream_gate drop=" + (settings.streaming ? "false" : "true") +
       " drop-mode=transform-to-gap ! rtp" + codec +
-      "pay config-interval=1 pt=96 ! "
+      "pay name=stream_rtp config-interval=1 pt=96 ! "
       "udpsink sync=false async=false host=" +
       Quote(settings.stream_host) +
       " port=" + std::to_string(settings.stream_port);

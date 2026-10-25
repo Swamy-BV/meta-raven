@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "frame_input.h"
 
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include <glib.h>
 #include <rclcpp/qos.hpp>
@@ -74,9 +74,9 @@ void RosFrameInput::Receive(sensor_msgs::msg::Image::ConstSharedPtr image) {
   latest_ = std::move(image);
 }
 
-raven::contracts::CameraFrame RosFrameInput::Latest() const {
+raven::vision::Frame RosFrameInput::Latest() const {
   sensor_msgs::msg::Image::ConstSharedPtr image;
-  raven::contracts::CameraFrame frame;
+  raven::vision::Frame frame;
   {
     std::lock_guard<std::mutex> const lock(mutex_);
     image = latest_;
@@ -94,12 +94,8 @@ raven::contracts::CameraFrame RosFrameInput::Latest() const {
   frame.optical_frame = image->header.frame_id;
   frame.width = static_cast<int>(image->width);
   frame.height = static_cast<int>(image->height);
-  const auto row = static_cast<std::size_t>(image->width) * kChannels;
-  frame.data.resize(row * image->height);
-  for (std::uint32_t y = 0; y < image->height; ++y) {
-    std::memcpy(frame.data.data() + y * row,
-                image->data.data() + static_cast<std::size_t>(y) * image->step,
-                row);
-  }
+  frame.stride = static_cast<int>(image->step);
+  frame.bytes = image->data.size();
+  frame.pixels = std::shared_ptr<const std::uint8_t>(image, image->data.data());
   return frame;
 }

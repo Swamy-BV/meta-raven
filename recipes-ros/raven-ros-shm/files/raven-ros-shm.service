@@ -1,0 +1,32 @@
+[Unit]
+Description=ROS shared-memory transport manager
+After=local-fs.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=ros-shm
+Group=ros-shm
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+ExecStart=@ROS_PREFIX@/bin/iox-roudi -c /etc/ros/roudi.toml
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+UMask=0007
+# Clients join this private namespace for Iceoryx's Unix control sockets.
+PrivateTmp=yes
+NoNewPrivileges=yes
+# RouDi terminates registered clients when their shared memory is withdrawn.
+CapabilityBoundingSet=CAP_KILL
+AmbientCapabilities=CAP_KILL
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+DevicePolicy=closed
+MemoryMax=256M
+TasksMax=16

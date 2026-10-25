@@ -31,10 +31,12 @@ inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd useradd
 SYSTEMD_SERVICE:${PN} = "media-capture.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "disable"
 SYSTEMD_AUTO_ENABLE:${PN}:raven-frdm-imx95 = "enable"
+USERADD_DEPENDS = "raven-ros-shm"
 USERADD_PACKAGES = "${PN}"
 # Reserve UID/GID 970 across A/B slots; future service identities use separate IDs.
 GROUPADD_PARAM:${PN} = "--system --gid 970 media-capture"
-USERADD_PARAM:${PN} = "--system --uid 970 --gid media-capture --home-dir ${localstatedir}/lib/media-capture \
+USERADD_PARAM:${PN} = "--system --uid 970 --gid media-capture --groups ros-shm \
+                       --home-dir ${localstatedir}/lib/media-capture \
                        --no-create-home --shell /sbin/nologin media-capture"
 CONFFILES:${PN} = "${sysconfdir}/media-capture.yaml"
 FILES:${PN}:append = " ${systemd_system_unitdir}/media-capture.service.d ${nonarch_libdir}/tmpfiles.d"
@@ -60,6 +62,7 @@ RDEPENDS:${PN} = "\
     image-transport \
     platform-interfaces \
     raven-ros-config \
+    raven-ros-shm \
     rclcpp \
     rmw-cyclonedds-cpp \
     sensor-msgs \

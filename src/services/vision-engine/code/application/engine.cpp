@@ -34,10 +34,10 @@
 #include <nlohmann/json.hpp>
 
 #include "../core/decode.h"
+#include "../core/frame.h"
 #include "../core/result.h"
 #include "../detection.h"
 #include "../inference_worker.h"
-#include <raven/contracts/camera.h>
 
 namespace {
 constexpr auto kMaxConfigBytes = 65536;
@@ -480,11 +480,11 @@ class Runner {
     fs::path image;
     bool selection = false;
     std::shared_ptr<ResidentWorker> runtime;
-    std::optional<raven::contracts::CameraFrame> frame;
+    std::optional<raven::vision::Frame> frame;
     AssetStamps assets;
   };
 
-  void RecordFrame(const raven::contracts::CameraFrame& frame) {
+  void RecordFrame(const raven::vision::Frame& frame) {
     auto now = static_cast<uint64_t>(g_get_monotonic_time());
     if (now < frame.captured_us ||
         now - frame.captured_us >
@@ -553,8 +553,9 @@ class Runner {
                                       kMicrosPerMillisecond) {
       Fail("media frame is stale");
     }
-    return runtime->InferFrame(frame.data, frame.width, frame.height, deadline,
-                               cancel);
+    return runtime->InferFrame(
+        {frame.pixels.get(), frame.width, frame.height, frame.stride, 3},
+        deadline, cancel);
   }
 
   void CheckJobAssets(const JobInput& input, bool& assets_changed) const {
@@ -625,9 +626,8 @@ class Runner {
     }
   }
 
-  Json Start(
-      const Model& m, const fs::path& image, bool selection,
-      std::optional<raven::contracts::CameraFrame> frame = std::nullopt) {
+  Json Start(const Model& m, const fs::path& image, bool selection,
+             std::optional<raven::vision::Frame> frame = std::nullopt) {
     if (busy) {
       Fail("worker busy; wait or cancel");
     }

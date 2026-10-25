@@ -39,7 +39,6 @@
 #include "neutron_backend.h"
 #include "rgb_input.h"
 #include "yolov8_model.h"
-#include <raven/contracts/camera.h>
 
 namespace {
 constexpr auto kExecFailureExitCode = 127;
@@ -80,7 +79,6 @@ constexpr auto kMaxEncodedImageBytesSigned = 16LL * 1024 * 1024;
 constexpr auto kMaxEncodedImageBytes = 16ULL * 1024 * 1024;
 constexpr auto kPngSignatureBytes = 8;
 constexpr auto kMinEncodedImageBytes = 8;
-constexpr auto kMinFrameBytes = 8;
 constexpr auto kMaxQuantizedByte = 255;
 constexpr auto kWorkerPollIntervalMs = 5;
 }  // namespace
@@ -121,6 +119,7 @@ ResidentWorker::~ResidentWorker() { Terminate(); }
 
 struct SpawnArguments {
   std::string model, labels, task, backend, threads;
+  int frame_descriptor = -1;
 };
 
 static void ExecChild(const SpawnArguments& args, const int (&in)[2],
@@ -143,6 +142,14 @@ static void ExecChild(const SpawnArguments& args, const int (&in)[2],
   close(in[1]);
   close(out[0]);
   close(out[1]);
+  if (dup2(args.frame_descriptor, WorkerFrameBuffer::kInheritedDescriptor) <
+          0 ||
+      fcntl(WorkerFrameBuffer::kInheritedDescriptor, F_SETFD, 0) < 0) {
+    _exit(kExecFailureExitCode);
+  }
+  if (args.frame_descriptor != WorkerFrameBuffer::kInheritedDescriptor) {
+    close(args.frame_descriptor);
+  }
   // Fixed executable and argv; no shell or configurable plugin path.
   execl("/proc/self/exe", "vision-engine", "--inference-worker",
         args.model.c_str(), args.labels.c_str(), args.task.c_str(),
@@ -167,8 +174,9 @@ ResidentWorker::ResidentWorker(const WorkerSettings& settings,
     close(in[1]);
     throw std::runtime_error("cannot create worker output pipe");
   }
-  const SpawnArguments args{model.string(), labels.string(), task, backend,
-                            std::to_string(threads)};
+  const SpawnArguments args{
+      model.string(), labels.string(),         task,
+      backend,        std::to_string(threads), frames_.ReadDescriptor()};
   pid_t const parent = getpid();
   pid_ = fork();
   if (pid_ == 0) {
@@ -241,8 +249,8 @@ Json ResidentWorker::ExchangeLoop(const std::string& message,
     if (end != std::string::npos) {
       return DecodeResponse(end);
     }
-    // Large raw frames need multiple pipe writes. Wait for either pipe,
-    // rather than adding a response-only delay after every partial write.
+    // Pipes carry bounded requests/results only; RGB pixels stay in the
+    // shared mapping until the worker acknowledges this request.
     pollfd fds[]{{output_,
                   static_cast<short>(static_cast<unsigned>(POLLIN) |
                                      static_cast<unsigned>(POLLHUP)),
@@ -257,13 +265,8 @@ Json ResidentWorker::ExchangeLoop(const std::string& message,
 
 Json ResidentWorker::Exchange(const Json* request,
                               std::chrono::steady_clock::time_point deadline,
-                              std::atomic<bool>& cancel,
-                              const std::vector<uint8_t>* payload) {
-  std::string message = request ? request->dump() + "\n" : "";
-  if (payload) {
-    message.append(reinterpret_cast<const char*>(payload->data()),
-                   payload->size());
-  }
+                              std::atomic<bool>& cancel) {
+  std::string const message = request ? request->dump() + "\n" : "";
   try {
     return ExchangeLoop(message, deadline, cancel);
   } catch (...) {
@@ -279,17 +282,14 @@ Json ResidentWorker::Infer(const std::filesystem::path& image,
   return Exchange(&request, deadline, cancel);
 }
 
-Json ResidentWorker::InferFrame(const std::vector<uint8_t>& pixels, int width,
-                                int height,
+Json ResidentWorker::InferFrame(const RgbLayout& image,
                                 std::chrono::steady_clock::time_point deadline,
                                 std::atomic<bool>& cancel) {
-  Require(!pixels.empty() && pixels.size() <= raven::contracts::kMaxCameraBytes,
-          "invalid frame payload");
-  Json const request{{"format", "rgb"},
-                     {"bytes", pixels.size()},
-                     {"width", width},
-                     {"height", height}};
-  return Exchange(&request, deadline, cancel, &pixels);
+  Require(!cancel && Clock::now() < deadline, "frame job cancelled or expired");
+  frames_.Write(image);
+  Json const request{
+      {"format", "rgb"}, {"width", image.width}, {"height", image.height}};
+  return Exchange(&request, deadline, cancel);
 }
 
 namespace {
@@ -604,19 +604,19 @@ class Classifier : public InferenceModel {
     return Classify(Decode(ReadImage(image)), started);
   }
 
-  Json Infer(const std::vector<uint8_t>& bytes, int frame_width,
-             int frame_height) override {
+  Json Infer(const RgbLayout& image) override {
     auto started = Clock::now();
-    Require(
-        frame_width >= kMinFrameDimension && frame_width <= kMaxFrameWidth &&
-            frame_height >= kMinFrameDimension &&
-            frame_height <= kMaxFrameHeight &&
-            bytes.size() == static_cast<size_t>(frame_width) * frame_height * 3,
-        "invalid RGB frame dimensions");
+    Require(image.source != nullptr && image.channels == 3 &&
+                image.width >= kMinFrameDimension &&
+                image.width <= kMaxFrameWidth &&
+                image.height >= kMinFrameDimension &&
+                image.height <= kMaxFrameHeight &&
+                image.stride >= image.width * 3,
+            "invalid RGB frame dimensions");
     Pixbuf decoded(
-        gdk_pixbuf_new_from_data(bytes.data(), GDK_COLORSPACE_RGB, false,
-                                 kChannelBits, frame_width, frame_height,
-                                 frame_width * 3, nullptr, nullptr),
+        gdk_pixbuf_new_from_data(image.source, GDK_COLORSPACE_RGB, false,
+                                 kChannelBits, image.width, image.height,
+                                 image.stride, nullptr, nullptr),
         g_object_unref);
     Require(decoded != nullptr, "cannot wrap RGB frame");
     return Classify(std::move(decoded), started);
@@ -876,31 +876,25 @@ std::vector<uint8_t> LoadRgbImage(const std::filesystem::path& image,
 }
 
 static Json ProcessRequest(InferenceModel& classifier,
+                           const WorkerFrameBuffer& frames,
                            const std::string& line) {
   Json reply;
   Json request = Json::parse(line);
   if (request.is_object() && request.size() == 1 && request.contains("image")) {
     reply = classifier.Infer(request.at("image").get<std::string>());
   } else {
-    Require(request.is_object() && request.size() == 4 &&
+    Require(request.is_object() && request.size() == 3 &&
                 request.value("format", "") == "rgb" &&
-                request.contains("bytes") && request.contains("width") &&
-                request.contains("height"),
+                request.contains("width") && request.contains("height"),
             "invalid inference request");
-    size_t const size = request.at("bytes");
-    Require(size >= kMinFrameBytes && size <= raven::contracts::kMaxCameraBytes,
-            "invalid frame size");
-    std::vector<uint8_t> bytes(size);
-    std::cin.read(reinterpret_cast<char*>(bytes.data()),
-                  static_cast<std::streamsize>(size));
-    Require(std::cin.good() && static_cast<size_t>(std::cin.gcount()) == size,
-            "incomplete frame payload");
-    reply = classifier.Infer(bytes, request.at("width"), request.at("height"));
+    reply = classifier.Infer(
+        frames.Read(request.at("width"), request.at("height")));
   }
   return reply;
 }
 
 static int WorkerLoop(InferenceModel& classifier,
+                      const WorkerFrameBuffer& frames,
                       const std::function<bool(const Json&)>& send) {
   // Bounded framing, including malformed or partial input from a supervisor.
   for (;;) {
@@ -915,7 +909,7 @@ static int WorkerLoop(InferenceModel& classifier,
     }
     Json reply;
     try {
-      reply = ProcessRequest(classifier, line);
+      reply = ProcessRequest(classifier, frames, line);
     } catch (const std::exception& e) {
       reply = {{"ok", false}, {"error", e.what()}};
     }
@@ -945,6 +939,7 @@ int InferenceWorker(const char* model, const char* labels, const char* task,
            fflush(protocol.get()) == 0;
   };
   try {
+    const WorkerFrameBuffer frames(WorkerFrameBuffer::kInheritedDescriptor);
     Require(threads >= 1 && threads <= 4, "invalid thread count");
     std::unique_ptr<InferenceModel> classifier;
     if (std::string(task) == "yolox" || std::string(task) == "yolov6" ||
@@ -959,7 +954,7 @@ int InferenceWorker(const char* model, const char* labels, const char* task,
     if (!send(Json({{"ok", true}}))) {
       return 1;
     }
-    return WorkerLoop(*classifier, send);
+    return WorkerLoop(*classifier, frames, send);
   } catch (const std::exception& e) {
     send(Json({{"ok", false}, {"error", e.what()}}));
     return 1;

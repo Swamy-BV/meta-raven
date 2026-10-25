@@ -21,6 +21,7 @@
 
 #include "../../core/types.h"
 #include "pipeline.h"
+#include "rtp_origin.h"
 #include <raven/contracts/camera.h>
 
 namespace raven::media {
@@ -177,6 +178,7 @@ class GstreamerBackend::Impl {
   GstElement* stream_gate = nullptr;
   GstElement* input = nullptr;
   GstBus* bus = nullptr;
+  std::unique_ptr<RtpOrigin> stream_origin;
   bool photo_pending = false;
   bool eos = false;
   std::uint64_t sequence = 0;
@@ -196,6 +198,7 @@ class GstreamerBackend::Impl {
   }
 
   void Clear() {
+    stream_origin.reset();
     for (auto** element :
          {&photos, &frames, &photo_gate, &stream_gate, &input}) {
       if (*element) {
@@ -261,6 +264,16 @@ void GstreamerBackend::Start(const Settings& settings,
     g_clear_error(&error);
     impl_->Clear();
     throw std::runtime_error(message);
+  }
+  try {
+    if (settings.source.kind == "rtp" &&
+        settings.source.rtp_capture_timestamps &&
+        (settings.streaming || settings.recording)) {
+      impl_->stream_origin = std::make_unique<RtpOrigin>(impl_->pipeline);
+    }
+  } catch (...) {
+    impl_->Clear();
+    throw;
   }
   impl_->photos = Element(impl_->pipeline, "photos");
   impl_->frames = Element(impl_->pipeline, "frames");

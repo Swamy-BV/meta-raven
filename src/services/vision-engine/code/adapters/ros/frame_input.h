@@ -9,15 +9,16 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/subscription.hpp>
 
+#include "core/frame.h"
 #include "sensor_msgs/msg/image.hpp"
-#include <raven/contracts/camera.h>
 
 // One latest ROS sample. Receive runs on the ROS executor; Latest runs
-// on the application thread. It returns packed pixels owned by the caller.
+// on the application thread. The returned view retains its source message
+// without copying pixels.
 class RosFrameInput {
  public:
   RosFrameInput(rclcpp::Node& node, const std::string& topic);
-  [[nodiscard]] raven::contracts::CameraFrame Latest() const;
+  [[nodiscard]] raven::vision::Frame Latest() const;
 
  private:
   void Receive(sensor_msgs::msg::Image::ConstSharedPtr image);

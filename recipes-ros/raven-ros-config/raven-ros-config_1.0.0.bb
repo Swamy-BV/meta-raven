@@ -7,8 +7,16 @@ LICENSE = "AGPL-3.0-only"
 # nooelint: oelint.var.licenseremotefile Local Raven sources use the common AGPL-3.0-only text.
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/AGPL-3.0-only;md5=73f1eb20517c55bf9493b7dd6e480788"
 DEPENDS = "ament-cmake-native"
-RDEPENDS:${PN} = "rmw-cyclonedds-cpp"
+RDEPENDS:${PN} = "\
+    raven-ros-shm \
+    rmw-cyclonedds-cpp \
+"
 ROS_BPN = "raven_ros_config"
 inherit ros_distro_jazzy ros_component ros_ament_cmake raven_source allarch
 EXTRA_OECMAKE += "-DROS_CONFIG_DIR=${sysconfdir}/ros"
-CONFFILES:${PN} = "${sysconfdir}/ros/cyclonedds.xml ${sysconfdir}/ros/ros2.env"
+CONFFILES:${PN} = "\
+    ${sysconfdir}/ros/cyclonedds.xml \
+    ${sysconfdir}/ros/cyclonedds-shm.xml \
+    ${sysconfdir}/ros/ros2.env \
+    ${sysconfdir}/ros/ros2-shm.env \
+"

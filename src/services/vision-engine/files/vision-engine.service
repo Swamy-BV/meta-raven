@@ -1,4 +1,8 @@
 [Unit]
+Requires=raven-ros-shm.service
+After=raven-ros-shm.service
+JoinsNamespaceOf=raven-ros-shm.service
+PartOf=raven-ros-shm.service
 Description=Camera inference and ROS vision outputs
 After=local-fs.target media-capture.service
 StartLimitIntervalSec=120
@@ -7,13 +11,14 @@ StartLimitBurst=3
 [Service]
 Type=simple
 User=vision-engine
-Group=vision-engine
-SupplementaryGroups=video
+Group=ros-shm
+SupplementaryGroups=video ros-shm
 LogsDirectory=vision-engine
 Environment=ROS_LOG_DIR=/var/log/vision-engine
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
 EnvironmentFile=/etc/ros/ros2.env
+EnvironmentFile=/etc/ros/ros2-shm.env
 ExecStart=@ROS_PREFIX@/lib/vision_engine/vision-engine --ros-args --params-file /etc/vision-engine.yaml
 Restart=on-failure
 RestartSec=10

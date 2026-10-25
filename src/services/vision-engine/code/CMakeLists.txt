@@ -31,6 +31,7 @@ add_executable(
   application/engine.cpp
   core/decode.cpp
   inference_worker.cpp
+  worker_frame_buffer.cpp
   onnx_model.cpp
   yolov8_model.cpp
   adapters/ros/frame_input.cpp

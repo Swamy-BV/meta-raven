@@ -13,6 +13,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include "rgb_input.h"
+#include "worker_frame_buffer.h"
+
 class InferenceModel {
  public:
   InferenceModel() = default;
@@ -22,8 +25,7 @@ class InferenceModel {
   InferenceModel& operator=(InferenceModel&&) = delete;
   virtual ~InferenceModel() = default;
   virtual nlohmann::json Infer(const std::filesystem::path& image) = 0;
-  virtual nlohmann::json Infer(const std::vector<uint8_t>& rgb, int width,
-                               int height) = 0;
+  virtual nlohmann::json Infer(const RgbLayout& image) = 0;
 };
 
 std::vector<uint8_t> LoadRgbImage(const std::filesystem::path& image,
@@ -54,14 +56,14 @@ class ResidentWorker {
   nlohmann::json Infer(const std::filesystem::path& image,
                        std::chrono::steady_clock::time_point deadline,
                        std::atomic<bool>& cancel);
-  nlohmann::json InferFrame(const std::vector<uint8_t>& pixels, int width,
-                            int height,
+  nlohmann::json InferFrame(const RgbLayout& image,
                             std::chrono::steady_clock::time_point deadline,
                             std::atomic<bool>& cancel);
 
   [[nodiscard]] bool Ready() const { return healthy_.load(); }
 
  private:
+  WorkerFrameBuffer frames_;
   pid_t pid_ = -1;
   int input_ = -1, output_ = -1;
   std::string buffered_;
@@ -75,8 +77,7 @@ class ResidentWorker {
                               std::atomic<bool>& cancel);
   nlohmann::json Exchange(const nlohmann::json* request,
                           std::chrono::steady_clock::time_point deadline,
-                          std::atomic<bool>& cancel,
-                          const std::vector<uint8_t>* payload = nullptr);
+                          std::atomic<bool>& cancel);
 };
 
 int InferenceWorker(const char* model, const char* labels, const char* task,

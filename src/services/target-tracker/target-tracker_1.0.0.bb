@@ -26,8 +26,13 @@ SRC_URI = "\
     file://target-tracker.yaml \
 "
 ROS_BPN = "target_tracker"
-inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd
+inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd useradd
 
+USERADD_DEPENDS = "raven-ros-shm"
+USERADD_PACKAGES = "${PN}"
+GROUPADD_PARAM:${PN} = "--system --gid 972 target-tracker"
+USERADD_PARAM:${PN} = "--system --uid 972 --gid target-tracker --groups ros-shm \
+                       --no-create-home --shell /sbin/nologin target-tracker"
 SYSTEMD_SERVICE:${PN} = "target-tracker.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 CONFFILES:${PN} = "${sysconfdir}/target-tracker.yaml"
@@ -35,6 +40,7 @@ RDEPENDS:${PN} = "\
     diagnostic-msgs \
     px4-msgs \
     raven-ros-config \
+    raven-ros-shm \
     rclcpp \
     rmw-cyclonedds-cpp \
     sensor-msgs \

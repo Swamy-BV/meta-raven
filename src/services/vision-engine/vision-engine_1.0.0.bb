@@ -36,9 +36,11 @@ inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd useradd
 
 SYSTEMD_SERVICE:${PN} = "vision-engine.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+USERADD_DEPENDS = "raven-ros-shm"
 USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "--system --gid 971 vision-engine"
-USERADD_PARAM:${PN} = "--system --uid 971 --gid vision-engine --home-dir ${localstatedir}/lib/vision-engine \
+USERADD_PARAM:${PN} = "--system --uid 971 --gid vision-engine --groups ros-shm \
+                       --home-dir ${localstatedir}/lib/vision-engine \
                        --no-create-home --shell /sbin/nologin vision-engine"
 CONFFILES:${PN} = "${sysconfdir}/vision-engine.conf ${sysconfdir}/vision-engine.yaml"
 FILES:${PN} += "${nonarch_libdir}/tmpfiles.d/vision-engine.conf"
@@ -46,6 +48,7 @@ RDEPENDS:${PN} = "\
     diagnostic-msgs \
     gdk-pixbuf-loader-bmp \
     raven-ros-config \
+    raven-ros-shm \
     rcl-interfaces \
     rclcpp \
     rmw-cyclonedds-cpp \

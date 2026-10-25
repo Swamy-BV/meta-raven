@@ -2,6 +2,7 @@
 #include "yolov8_model.h"
 
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <cmath>
 #include <cstddef>
@@ -46,52 +47,71 @@ void ValidateOutput(const TfLiteTensor* tensor, const int channels) {
           "YOLOv8 output contract mismatch");
 }
 
-std::vector<float> ReadOutput(const TfLiteTensor* tensor) {
-  const auto size = TfLiteTensorByteSize(tensor);
-  std::vector<int8_t> values(size);
-  Require(TfLiteTensorCopyToBuffer(tensor, values.data(), size) == kTfLiteOk,
-          "cannot read YOLOv8 output");
-  const auto quant = TfLiteTensorQuantizationParams(tensor);
-  std::vector<float> result(size);
-  std::transform(
-      values.begin(), values.end(), result.begin(),
-      [quant](const int8_t value) {
-        return static_cast<float>(static_cast<int>(value) - quant.zero_point) *
-               quant.scale;
-      });
-  return result;
+// The interpreter owns these views until its next invocation. Decode completes
+// synchronously before another invocation can overwrite the tensors.
+struct QuantizedOutput {
+  const int8_t* values;
+  TfLiteQuantizationParams quantization;
+
+  [[nodiscard]] double Value(const size_t index) const {
+    return static_cast<float>(static_cast<int>(values[index]) -
+                              quantization.zero_point) *
+           quantization.scale;
+  }
+};
+
+QuantizedOutput Output(const TfLiteTensor* tensor) {
+  const auto* values = static_cast<const int8_t*>(TfLiteTensorData(tensor));
+  Require(values != nullptr, "YOLOv8 output is not host accessible");
+  return {values, TfLiteTensorQuantizationParams(tensor)};
 }
 
-std::vector<uint8_t> PackLetterbox(GdkPixbuf* resized,
-                                   const Letterbox& geometry) {
+void PackLetterbox(GdkPixbuf* resized, const Letterbox& geometry,
+                   TfLiteTensor* tensor) {
   constexpr auto kBytes =
       static_cast<size_t>(kDimension) * kDimension * kChannels;
-  std::vector<uint8_t> bytes(kBytes, kPadding);
-  const auto* pixels = gdk_pixbuf_read_pixels(resized);
-  const auto stride = gdk_pixbuf_get_rowstride(resized);
-  const auto channels = gdk_pixbuf_get_n_channels(resized);
-  Require(channels == 3 || channels == 4, "unsupported image channels");
+  Require(TfLiteTensorByteSize(tensor) == kBytes,
+          "YOLOv8 input tensor size changed");
+  auto* target = static_cast<uint8_t*>(TfLiteTensorData(tensor));
+  Require(target != nullptr, "YOLOv8 input is not host accessible");
+  std::fill_n(target, kBytes, kPadding);
+  const RgbLayout layout{gdk_pixbuf_read_pixels(resized), geometry.width,
+                         geometry.height, gdk_pixbuf_get_rowstride(resized),
+                         gdk_pixbuf_get_n_channels(resized)};
+  Require(layout.channels == 3 || layout.channels == 4,
+          "unsupported image channels");
   for (int y = 0; y < geometry.height; ++y) {
-    for (int x = 0; x < geometry.width; ++x) {
-      const auto source =
-          static_cast<size_t>(y) * stride + static_cast<size_t>(x) * channels;
-      const auto destination =
-          (static_cast<size_t>(y + geometry.top) * kDimension + x +
-           geometry.left) *
-          kChannels;
-      std::copy_n(pixels + source, kChannels, bytes.data() + destination);
-    }
+    const auto destination =
+        (static_cast<size_t>(y + geometry.top) * kDimension + geometry.left) *
+        kChannels;
+    PackRgbRow(layout.source + static_cast<size_t>(y) * layout.stride,
+               target + destination, layout, 0);
   }
-  return bytes;
 }
 
-int BestClass(const std::vector<float>& scores, const size_t candidate) {
-  int best = 0;
-  for (int cls = 1; cls < kClasses; ++cls) {
-    if (scores[static_cast<size_t>(cls) * kCandidates + candidate] >
-        scores[static_cast<size_t>(best) * kCandidates + candidate]) {
-      best = cls;
+struct BestClasses {
+  std::array<int8_t, kCandidates> scores{};
+  std::array<uint8_t, kCandidates> ids{};
+};
+
+void UpdateClasses(const int8_t* plane, const uint8_t cls, BestClasses& best) {
+  for (size_t index = 0; index < kCandidates; ++index) {
+    if (plane[index] > best.scores[index]) {
+      best.scores[index] = plane[index];
+      best.ids[index] = cls;
     }
+  }
+}
+
+BestClasses FindClasses(const QuantizedOutput& scores) {
+  BestClasses best;
+  std::copy_n(scores.values, kCandidates, best.scores.begin());
+  // Scores share one positive quantization scale. Comparing quantized values
+  // preserves argmax and first-class tie breaking, without dequantizing 672k
+  // values. Scan each class contiguously rather than striding across planes.
+  for (int cls = 1; cls < kClasses; ++cls) {
+    UpdateClasses(scores.values + static_cast<size_t>(cls) * kCandidates,
+                  static_cast<uint8_t>(cls), best);
   }
   return best;
 }
@@ -143,16 +163,14 @@ Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter,
   const Letterbox geometry{resized_width, resized_height,
                            (kDimension - resized_width) / 2,
                            (kDimension - resized_height) / 2};
-  const Pixbuf resized(
-      gdk_pixbuf_scale_simple(source.get(), resized_width, resized_height,
-                              GDK_INTERP_BILINEAR),
-      g_object_unref);
-  Require(resized != nullptr, "YOLOv8 letterbox resize failed");
-  const auto bytes = PackLetterbox(resized.get(), geometry);
-  Require(TfLiteTensorCopyFromBuffer(
-              TfLiteInterpreterGetInputTensor(interpreter, 0), bytes.data(),
-              bytes.size()) == kTfLiteOk,
-          "cannot fill YOLOv8 input");
+  Pixbuf resized(nullptr, g_object_unref);
+  if (resized_width != width || resized_height != height) {
+    resized.reset(gdk_pixbuf_scale_simple(source.get(), resized_width,
+                                          resized_height, GDK_INTERP_BILINEAR));
+    Require(resized != nullptr, "YOLOv8 letterbox resize failed");
+  }
+  PackLetterbox(resized ? resized.get() : source.get(), geometry,
+                TfLiteInterpreterGetInputTensor(interpreter, 0));
   return geometry;
 }
 
@@ -160,29 +178,23 @@ std::vector<detection::Box> DecodeYoloV8(const TfLiteInterpreter* interpreter,
                                          const Letterbox& geometry) {
   Require(geometry.width > 0 && geometry.height > 0,
           "missing YOLOv8 letterbox geometry");
-  const auto boxes =
-      ReadOutput(TfLiteInterpreterGetOutputTensor(interpreter, 0));
-  const auto scores =
-      ReadOutput(TfLiteInterpreterGetOutputTensor(interpreter, 1));
+  const auto boxes = Output(TfLiteInterpreterGetOutputTensor(interpreter, 0));
+  const auto scores = Output(TfLiteInterpreterGetOutputTensor(interpreter, 1));
+  const auto best = FindClasses(scores);
   std::vector<detection::Box> result;
   for (size_t index = 0; index < kCandidates; ++index) {
-    const auto cls = BestClass(scores, index);
-    const auto score = static_cast<double>(
-        scores[static_cast<size_t>(cls) * kCandidates + index]);
+    const auto cls = best.ids[index];
+    const auto score =
+        scores.Value(static_cast<size_t>(cls) * kCandidates + index);
     if (score < detection::kDefaultScoreThreshold) {
       continue;
     }
-    const auto center_x = static_cast<double>(boxes[index]) * kDimension;
-    const auto center_y =
-        static_cast<double>(boxes[kCandidates + index]) * kDimension;
+    const auto center_x = boxes.Value(index) * kDimension;
+    const auto center_y = boxes.Value(kCandidates + index) * kDimension;
     const auto width =
-        static_cast<double>(
-            boxes[static_cast<size_t>(2) * kCandidates + index]) *
-        kDimension;
+        boxes.Value(static_cast<size_t>(2) * kCandidates + index) * kDimension;
     const auto height =
-        static_cast<double>(
-            boxes[static_cast<size_t>(3) * kCandidates + index]) *
-        kDimension;
+        boxes.Value(static_cast<size_t>(3) * kCandidates + index) * kDimension;
     result.push_back({(center_x - width / 2 - geometry.left) / geometry.width,
                       (center_y - height / 2 - geometry.top) / geometry.height,
                       (center_x + width / 2 - geometry.left) / geometry.width,

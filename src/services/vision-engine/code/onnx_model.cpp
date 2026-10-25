@@ -25,6 +25,7 @@
 
 #include "detection.h"
 #include "inference_worker.h"
+#include "rgb_input.h"
 
 namespace {
 namespace {
@@ -220,7 +221,7 @@ class OnnxModel : public InferenceModel {
     int w = 0;
     int h = 0;
     auto rgb = LoadRgbImage(file, w, h);
-    return Infer(rgb, w, h);
+    return Infer({rgb.data(), w, h, w * 3, 3});
   }
 
   struct Geometry {
@@ -269,11 +270,11 @@ class OnnxModel : public InferenceModel {
   }
 
   [[nodiscard]] std::vector<float> PrepareInput(
-      const std::vector<uint8_t>& rgb, const Geometry& geometry) const {
+      const RgbLayout& rgb, const Geometry& geometry) const {
     Ptr<GdkPixbuf> const image(
-        gdk_pixbuf_new_from_data(rgb.data(), GDK_COLORSPACE_RGB, false,
+        gdk_pixbuf_new_from_data(rgb.source, GDK_COLORSPACE_RGB, false,
                                  kSmallGridStride, geometry.w, geometry.h,
-                                 geometry.w * 3, nullptr, nullptr),
+                                 rgb.stride, nullptr, nullptr),
         g_object_unref);
     Require(image != nullptr, "cannot wrap ONNX image");
     Ptr<GdkPixbuf> const resized(
@@ -393,11 +394,13 @@ class OnnxModel : public InferenceModel {
     return boxes;
   }
 
-  Json Infer(const std::vector<uint8_t>& rgb, int w, int h) override {
+  Json Infer(const RgbLayout& rgb) override {
+    const auto w = rgb.width;
+    const auto h = rgb.height;
     auto start = Clock::now();
     Require(w > 0 && w <= kMaxImageDimension && h > 0 &&
-                h <= kMaxImageDimension &&
-                rgb.size() == static_cast<size_t>(w) * h * 3,
+                h <= kMaxImageDimension && rgb.source != nullptr &&
+                rgb.channels == 3 && rgb.stride >= w * 3,
             "invalid ONNX RGB input");
     const auto geometry = ResizeGeometry(w, h);
     auto pixels = PrepareInput(rgb, geometry);

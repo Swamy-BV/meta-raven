@@ -1,0 +1,28 @@
+# Bounded pools for metadata, 640x360 RGB, and frames up to 8 MiB.
+# Pool sizes include serialization and Iceoryx chunk-header overhead.
+[general]
+version = 1
+
+[[segment]]
+reader = "ros-shm"
+writer = "ros-shm"
+
+[[segment.mempool]]
+size = 256
+count = 1024
+
+[[segment.mempool]]
+size = 4096
+count = 512
+
+[[segment.mempool]]
+size = 65536
+count = 128
+
+[[segment.mempool]]
+size = 1048576
+count = 32
+
+[[segment.mempool]]
+size = 8389632
+count = 8

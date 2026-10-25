@@ -52,12 +52,13 @@ and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
 
 ## Current progress
 
-Validation snapshot: **24 October 2026**. These are simulation and hardware
+Validation snapshot: **25 October 2026**. These are simulation and hardware
 bring-up results, not physical flight qualification.
 
 | Area | Validated result | Remaining work |
 | --- | --- | --- |
 | WFB-ng video | RTL8812AU pair: hardware H.264 at 1080p/50 decoded at 49.98 fps over 32 seconds after SWUpdate and reboot. Board CPU averaged 14.9% of six-core capacity. H.265 passed earlier 720p/15 streaming and onboard recording tests | Qualify longer 1080p/50 runs, H.265/50, image quality, packet delay and loss; measure glass-to-glass latency and range |
+| Live video and vision | Ethernet camera ingress, i.MX95 hardware decode/encode, YOLOv8s NPU-backed detection and vehicle ReID, WFB-ng video return verified at 1080p/30. Shared-memory transport and tensor processing reduced total six-core CPU from 26.0% to 18.2% at the same workload; M7 flight control was inactive | Reduce remaining CPU model operators and ROS image serialization; qualify sustained latency, radio loss and range |
 | WFB-ng telemetry | WFB-ng carried PX4 and camera heartbeats plus 40/40 information responses with accepted command acknowledgements, including 20 with concurrent H.264 video. Ping replies: 10/10 without video, 9/10 with video | Tune the upstream 100 ms MAVLink aggregation window and packet loss; qualify longer runs and range |
 | OpenHD (optional) | IMX477 native 1920 x 1080 measured 30.01 fps using NXP open Neo IPA. Hardware H.264 at 720p/30 decoded at 27.1 fps over a 68-second radio run; board CPU averaged 14.4% of six-core capacity. Concurrent telemetry returned 28/30 information responses and 13/15 pings (4.6 ms median RTT). Photo capture and video start/stop commands passed over radio | Resolve radio delivery gaps and intermittent telemetry loss; qualify image quality, glass-to-glass latency, H.265 and range |
 | Open-road following | 61-second six-car runs with lane changes, including dense shuffling and a rear escort | Repeatability across speeds, viewpoints and vehicle appearances |

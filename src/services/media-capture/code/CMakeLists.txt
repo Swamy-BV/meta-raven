@@ -24,6 +24,7 @@ pkg_check_modules(
   gstreamer-1.0
   gstreamer-app-1.0
   gstreamer-video-1.0
+  gstreamer-rtp-1.0
   gio-unix-2.0
   gdk-pixbuf-2.0)
 add_executable(
@@ -33,6 +34,7 @@ add_executable(
   application/session.cpp
   adapters/gstreamer/backend.cpp
   adapters/gstreamer/pipeline.cpp
+  adapters/gstreamer/rtp_origin.cpp
   adapters/storage/photo_store.cpp
   adapters/ros/node.cpp
   adapters/ros/settings.cpp)
