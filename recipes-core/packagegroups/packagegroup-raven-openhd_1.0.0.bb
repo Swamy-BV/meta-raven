@@ -1,4 +1,4 @@
-SUMMARY = "Optional Raven OpenHD video and telemetry link"
+SUMMARY = "Raven OpenHD video and telemetry link"
 DESCRIPTION = "Headless OpenHD backend with an independently selected external radio driver"
 HOMEPAGE = "https://github.com/Swamy-BV/meta-raven"
 BUGTRACKER = "https://github.com/Swamy-BV/meta-raven/issues"

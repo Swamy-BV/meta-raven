@@ -1,4 +1,4 @@
-SUMMARY = "Optional OpenHD encoded video and telemetry radio backend"
+SUMMARY = "OpenHD encoded video and telemetry radio backend"
 DESCRIPTION = "Headless OpenHD using external RTP input and the existing flight-controller MAVLink router"
 HOMEPAGE = "https://github.com/OpenHD/OpenHD"
 BUGTRACKER = "https://github.com/OpenHD/OpenHD/issues"

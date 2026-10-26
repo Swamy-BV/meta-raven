@@ -19,7 +19,8 @@ IMAGE_FEATURES += "ssh-server-openssh read-only-rootfs"
 IMAGE_ROOTFS_SIZE = "${@str(int(d.getVar('RAVEN_ROOTFS_SIZE_MIB')) * 1024)}"
 IMAGE_ROOTFS_MAXSIZE = "${IMAGE_ROOTFS_SIZE}"
 IMAGE_ROOTFS_EXTRA_SPACE = "0"
-# Select packagegroup-raven-openhd in local.conf to evaluate the alternative.
+# Supported radio backends: WFB-ng (default) and OpenHD.
+# Select packagegroup-raven-openhd in local.conf to use OpenHD.
 VIRTUAL-RUNTIME_raven-radio-link ?= "packagegroup-raven-wfb"
 IMAGE_INSTALL:append = " \
     ros-base \

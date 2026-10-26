@@ -26,7 +26,7 @@ flowchart TD
 flowchart TD
     ground["Ground station"]
     router["mavlink-router"]
-    radio["Radio backend<br/>WFB-ng default / OpenHD optional"]
+    radio["Video and telemetry backend<br/>WFB-ng / OpenHD"]
     px4["M7 PX4"]
     camera["camera-mavlink"]
     capture["media-capture"]
