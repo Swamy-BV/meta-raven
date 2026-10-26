@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Raven controller</title>
+  <link rel="stylesheet" href="controller.css">
+</head>
+<body>
+  <header>
+    <div><strong>RAVEN</strong><span class="subtitle">Target selection</span></div>
+    <div class="badges"><span id="video-status">Video disconnected</span><span id="ros-status">ROS disconnected</span></div>
+    <button id="settings-toggle" aria-expanded="true" aria-controls="settings">Connection</button>
+  </header>
+  <form id="settings">
+    <label>WebRTC endpoint<input id="video-url" type="url" value="http://localhost:8889/front/whep" required></label>
+    <label>ROS bridge<input id="ros-url" type="url" value="ws://localhost:9090" required></label>
+    <button type="submit">Connect</button><button id="disconnect" type="button">Disconnect</button>
+  </form>
+  <main>
+    <div id="viewport">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="boxes" aria-label="Live target selection overlay"></canvas>
+      <div id="empty-state">Connect the video and ROS bridge to begin.</div>
+      <div id="hint">Click an outlined target to switch following.</div>
+    </div>
+    <section class="status-panel" aria-label="Guidance status">
+      <div><span class="caption">GUIDANCE</span><strong id="mode">Disconnected</strong></div>
+      <div><span class="caption">ACTIVE TARGET</span><strong id="target">—</strong></div>
+      <div><span class="caption">TARGET SPEED / RANGE</span><strong id="motion">—</strong></div>
+      <div><span class="caption">TRACKING</span><strong id="tracking">Waiting</strong></div>
+    </section>
+    <div id="targets" aria-label="Visible targets"></div>
+    <div id="choices" aria-label="Overlapping targets" hidden></div>
+    <p id="message" role="status" aria-live="polite">Selection changes the target only. This page does not arm or start following.</p>
+  </main>
+  <footer>WFB-ng received video · ROS selection over LAN · Latest tracking observations</footer>
+  <script src="reader.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

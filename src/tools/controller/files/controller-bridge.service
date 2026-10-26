@@ -1,0 +1,36 @@
+[Unit]
+Description=Controller ROS WebSocket bridge (explicit activation)
+After=network.target raven-ros-shm.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+Group=ros-shm
+LogsDirectory=controller-bridge
+Environment=ROS_LOG_DIR=/var/log/controller-bridge
+Environment=AMENT_PREFIX_PATH=/opt/ros/jazzy
+Environment=PYTHONPATH=/opt/ros/jazzy/lib/@PYTHON_DIR@/site-packages
+Environment=LD_LIBRARY_PATH=/opt/ros/jazzy/lib
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=/opt/ros/jazzy/lib/rosbridge_server/rosbridge_websocket --ros-args -r __node:=controller_bridge --params-file /etc/controller-bridge.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=256M
+TasksMax=64
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target
