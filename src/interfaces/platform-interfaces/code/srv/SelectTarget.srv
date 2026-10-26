@@ -1,4 +1,6 @@
-# Select one currently visible person/car track; no automatic identity switching.
+# Select one visible supported track. During following, a valid request switches
+# the active target while retaining bounded vehicle motion. Rejection preserves
+# the current selection; selection alone never enables a stopped behavior.
 string track_id
 ---
 bool success

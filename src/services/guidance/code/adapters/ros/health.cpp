@@ -69,6 +69,7 @@ void GuidanceNode::PublishHealth() {
   AddMetric(health, "local_frame", local_frame_);
   AddMetric(health, "braking", braking_ ? "true" : "false");
   AddMetric(health, "selected_track", selected_id_);
+  AddMetric(health, "target_switches", std::to_string(target_switches_));
   AddMetric(health, "px4_namespace", px4_namespace_);
   AddMetric(health, "setpoints_sent", std::to_string(setpoints_sent_));
   AddMetric(health, "control_step_ms",

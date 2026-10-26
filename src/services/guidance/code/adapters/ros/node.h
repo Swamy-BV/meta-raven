@@ -110,6 +110,10 @@ class GuidanceNode final : public rclcpp::Node {
   void ReceivePosition(const px4_msgs::msg::VehicleLocalPosition& message);
   void ReceiveAttitude(const px4_msgs::msg::VehicleAttitude& message);
   void SelectTarget(const Select::Request& request, Select::Response& response);
+  void RememberTarget(const vision_msgs::msg::Detection2D& detection);
+  // Called only during active following; rejected requests retain selection.
+  void SwitchTarget(const vision_msgs::msg::Detection2D& detection,
+                    Select::Response& response);
   [[nodiscard]] bool StartFollowing();
   void EnableFollowing(const Enable::Request& request,
                        Enable::Response& response);
@@ -195,6 +199,7 @@ class GuidanceNode final : public rclcpp::Node {
   std::optional<AlignedPose> alignment_;
   std::uint64_t pose_alignment_failures_ = 0;
   Clock::time_point last_position_, last_attitude_, last_status_, last_target_;
+  std::uint64_t target_switches_ = 0;
   std::uint64_t setpoints_sent_ = 0;
   std::uint64_t observations_used_ = 0;
   std::uint64_t rejected_observations_ = 0;

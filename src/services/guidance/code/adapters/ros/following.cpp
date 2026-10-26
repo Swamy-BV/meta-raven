@@ -20,44 +20,8 @@
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "util.h"
 #include "vision_msgs/msg/detection2_d.hpp"
-#include "vision_msgs/msg/object_hypothesis_with_pose.hpp"
 
 namespace raven::guidance {
-void GuidanceNode::SelectTarget(const Select::Request& request,
-                                Select::Response& response) {
-  response.success = false;
-  if (enabled_ || goal_reserved_) {
-    response.message = "Stop the active behavior before changing the target";
-    return;
-  }
-  if (request.track_id.empty() || request.track_id.size() > kMaxIdLength ||
-      !FreshTracks() || model_key_.empty()) {
-    response.message = "A fresh visible track and vision metadata are required";
-    return;
-  }
-  const auto found = std::find_if(
-      tracks_.detections.begin(), tracks_.detections.end(),
-      [this, &request](const auto& detection) {
-        return detection.id == request.track_id && Supported(detection);
-      });
-  if (found == tracks_.detections.end()) {
-    response.message = "Supported target track is not visible";
-    return;
-  }
-  motion_.Reset();
-  trail_.Reset();
-  target_.reset();
-  target_stamp_ns_ = 0;
-  selected_since_ = Clock::now();
-  selected_id_ = request.track_id;
-  selected_frame_ = tracks_.header.frame_id;
-  selected_class_ = found->results.front().hypothesis.class_id;
-  state_ = "selected";
-  reason_ = "Target selected; following is not enabled";
-  response.success = true;
-  response.message = reason_;
-}
-
 void GuidanceNode::EnableFollowing(const Enable::Request& request,
                                    Enable::Response& response) {
   response.success = false;

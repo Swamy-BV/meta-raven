@@ -38,6 +38,7 @@ add_executable(
   adapters/ros/observations.cpp
   adapters/ros/telemetry.cpp
   adapters/ros/following.cpp
+  adapters/ros/selection.cpp
   adapters/ros/health.cpp)
 target_include_directories(guidance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 ament_target_dependencies(
