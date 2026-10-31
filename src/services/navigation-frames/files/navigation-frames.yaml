@@ -1,0 +1,13 @@
+/**:
+  ros__parameters:
+    use_sim_time: false
+    px4_namespace: /simulation
+    vio_topic: /localization/vio/odometry
+    vio_world_frame: global
+    vio_imu_frame: imu
+    local_frame: vio_local
+    reference_frame: px4_local_enu
+    body_frame: base_link
+    max_age_ns: 200000000
+    imu_from_body_xyz: [0.0, 0.0, 0.0]
+    imu_from_body_wxyz: [1.0, 0.0, 0.0, 0.0]

@@ -1,0 +1,23 @@
+[Unit]
+Description=Acquisition-time navigation frame authority
+ConditionPathExists=/var/lib/navigation-frames/enable
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=navigation-frames
+Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
+Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
+EnvironmentFile=/etc/ros/ros2.env
+ExecStart=@ROS_PREFIX@/lib/navigation_frames/navigation-frames --ros-args --params-file /etc/navigation-frames.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

@@ -63,6 +63,31 @@ flowchart TD
 
 ## Visual odometry evaluation
 
+`navigation-frames` is the disabled-by-default frame authority for navigation.
+It brackets PX4 poses at VIO acquisition times, converts NED/FRD to ENU/FLU,
+and exposes the fused PX4 body pose through TF. VIO remains an input to PX4;
+it does not become a competing body-frame authority. Estimator resets,
+excessive disagreement and stale fusion stop valid transform publication.
+
+Mapping, measured target depth and obstacle-aware planning remain pending.
+Their intended boundaries are shown below; they are not enabled capabilities.
+
+```mermaid
+flowchart TD
+    vio[visual-odometry] --> adapter[px4-odometry]
+    adapter -->|External measurements through DDS| px4[M7 PX4 EKF2]
+    px4 -->|Fused aircraft pose| frames[navigation-frames]
+    vio -->|Acquisition-time alignment check| frames
+    lidar[LiDAR PointCloud2] -.-> mapper[Local mapping — planned]
+    frames -.->|Timestamped sensor transforms| mapper
+    tracks[target-tracker] -.-> depth[Target positioning — planned]
+    lidar -.-> depth
+    frames -.-> depth
+    mapper -.->|Occupancy and freshness| guidance[guidance]
+    depth -.->|Measured target position and uncertainty| guidance
+    guidance -->|Sole Linux setpoint writer through DDS| px4
+```
+
 `visual-odometry` runs the upstream OpenVINS ROS 2 node on i.MX95 Linux.
 `px4-odometry` checks acquisition time, frames and covariance, then converts
 the estimate into PX4 FRD measurements over the existing DDS link. The adapter

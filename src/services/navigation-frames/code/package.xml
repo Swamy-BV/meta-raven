@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>navigation_frames</name>
+  <version>1.0.0</version>
+  <description>Acquisition-time VIO to PX4 navigation-frame alignment.</description>
+  <maintainer email="maintainers@example.invalid">Raven maintainers</maintainer>
+  <license>AGPL-3.0-only</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>eigen</depend>
+  <depend>rclcpp</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>px4_msgs</depend>
+  <depend>tf2_ros</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
