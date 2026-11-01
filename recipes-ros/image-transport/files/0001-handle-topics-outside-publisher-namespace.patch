@@ -1,0 +1,36 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Handle image topics outside the publisher namespace
+
+A fully qualified image topic need not be below the publishing node namespace.
+Blindly removing the namespace length either truncates its plugin parameter key
+or throws std::out_of_range when the topic is shorter than the namespace.
+Only remove a complete namespace prefix and preserve the full topic otherwise.
+Also avoid front() on an empty string.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/src/publisher.cpp
++++ b/src/publisher.cpp
+@@ -111,10 +111,18 @@
+   impl_->base_topic_ = image_topic;
+   impl_->loader_ = loader;
+ 
+-  auto ns_len = node->get_effective_namespace().length();
+-  std::string param_base_name = image_topic.substr(ns_len);
++  const std::string node_ns = node->get_effective_namespace();
++  std::string param_base_name = image_topic;
++  // Absolute topics may lie outside this node's namespace. Strip only a
++  // complete namespace prefix; otherwise retain the full topic for the key.
++  if (image_topic.compare(0, node_ns.length(), node_ns) == 0 &&
++    (node_ns == "/" ||
++    (image_topic.length() > node_ns.length() && image_topic[node_ns.length()] == '/')))
++  {
++    param_base_name = image_topic.substr(node_ns.length());
++  }
+   std::replace(param_base_name.begin(), param_base_name.end(), '/', '.');
+-  if (param_base_name.front() == '.') {
++  if (!param_base_name.empty() && param_base_name.front() == '.') {
+     param_base_name = param_base_name.substr(1);
+   }
+   std::vector<std::string> allowlist_vec;
