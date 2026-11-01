@@ -1,67 +1,70 @@
 # Raven
 
-A modular drone platform on **NXP FRDM-IMX95**, combining Cortex-M7 PX4 flight
-control with Cortex-A55 Linux, ROS 2 and onboard AI in one Yocto build.
+A modular drone platform on **NXP FRDM-IMX95**: Cortex-M7 PX4 flight control,
+Cortex-A55 Linux, ROS 2 and onboard AI, integrated with Yocto.
 
 ## Demo
 
 [![City vehicle tracking on NXP FRDM-IMX95](https://raw.githubusercontent.com/Swamy-BV/raven-demos/main/images/city-tracking.png)](https://swamy-bv.github.io/raven-demos/)
 
 [Watch the city demo](https://swamy-bv.github.io/raven-demos/): selected-car
-following among 21 vehicles, intersections and roundabouts. i.MX95 NPU vision
-and Linux guidance run onboard, with M7 PX4 controlling the AirSim aircraft.
+following among 21 vehicles, intersections and roundabouts. i.MX95 runs vision
+and guidance; its M7 runs PX4 controlling the AirSim aircraft.
 
 ## Features
 
-- **Integrated firmware:** Linux, M7 PX4 and the i.MX boot container built together.
-- **Flight connectivity:** ROS 2 DDS over RPMsg and routed MAVLink for telemetry,
-  missions and flight commands.
-- **Camera and media:** ROS images and CameraInfo, photo capture, recording and
-  browser preview, with ROS and MAVLink controls. Hardware ISP and H.264/H.265
-  encoding; native 1080p/50 capture and 4K photos tested.
-- **Wireless video and telemetry:** WFB-ng and OpenHD backends, with bidirectional
-  MAVLink. WFB-ng H.264 video received at 1080p/50; OpenHD video and camera
-  commands tested alongside telemetry.
-- **Onboard vision:** Neutron NPU-backed detection and vehicle ReID, ByteTrack
-  tracking and selected-target following, with standard ROS vision messages.
-- **Visual navigation:** OpenVINS visual-inertial odometry feeds M7 PX4 through
-  ROS 2 DDS.
-- **Field updates:** SWUpdate web uploads, A/B Linux images and boot firmware
-  updates, with automatic slot switching and reboot.
+- **One firmware build:** Linux, M7 PX4 and i.MX boot firmware.
+- **Flight connectivity:** ROS 2 DDS over RPMsg and routed MAVLink telemetry,
+  missions and commands.
+- **Camera:** ROS images and calibration, photos, recording and browser preview;
+  ROS/MAVLink controls, hardware ISP, G2D conversion and H.264/H.265 encoding.
+  Native 1080p/50 capture and 4K photos tested.
+- **Wireless links:** WFB-ng and OpenHD video backends with bidirectional MAVLink.
+- **Vision and following:** Neutron NPU detection and vehicle ReID, ByteTrack
+  tracking, selected-target guidance and standard ROS vision messages.
+  Selectable Mali-G310 OpenCL image resizing reduces CPU preprocessing.
+- **Visual navigation:** OpenVINS camera/IMU odometry, selectable GPU feature
+  tracking and an odometry adapter to M7 PX4 over DDS.
+- **Updates:** SWUpdate web uploads, A/B Linux slots, boot firmware updates and
+  automatic slot switching and reboot.
 
-## Progress
+## Current state
 
-- **Following:** M7 PX4 hardware-in-the-loop runs cover city traffic, lane
-  changes and bridge occlusions. The five-bridge run recovered the selected
-  vehicle after every bridge, with 92% active following over 61 seconds.
-- **GPS-denied hover:** Takeoff, hover and landing tested with horizontal visual
-  odometry aiding and GPS aiding disabled; altitude still uses the barometer.
-- **Generative AI:** Onboard text generation and image question answering
-  demonstrated; image question answering required CPU fallback.
+- **M7 HITL:** City following, bridge reacquisition, and GPS-aiding-disabled
+  hover and landing tested; barometer aiding remains active.
+- **GPU bench tests:** Live-camera resizing reduced vision-engine CPU from
+  approximately 35% to 17% of one A55 core in 20-second samples. OpenVINS GPU
+  tracking was evaluated on i.MX95 against AirSim ground truth.
+- **AI demos:** Onboard text generation and image question answering demonstrated;
+  image question answering required CPU fallback.
 
-Flight behavior has been evaluated in simulation with the physical M7 running
-PX4. Physical flight and obstacle avoidance are not yet validated.
+GPU paths remain opt-in; M7 HITL validation is pending. Resize backends produce
+different detection boxes and scores; accuracy qualification is pending.
+Physical flight and obstacle avoidance are not yet validated.
 
 ## Components
 
 ```mermaid
 flowchart TD
     source["Camera / network video"] --> capture["media-capture"]
-    capture -->|ROS images| vision["vision-engine · NPU"]
+    capture -->|ROS RGB images| vision["vision-engine<br/>NPU / selectable GPU resize"]
     vision -->|Detections| tracker["target-tracker"]
     tracker -->|Tracked target| guidance["guidance"]
     guidance <-->|DDS / RPMsg| px4["Cortex-M7 · PX4"]
+    capture -->|Mono images| vio["OpenVINS<br/>CPU / GPU tracking"]
+    imu["IMU"] --> vio
+    vio -->|px4-odometry / DDS| px4
     capture -->|Encoded video| radio["WFB-ng / OpenHD"]
     px4 <-->|Routed MAVLink| radio
     radio <-->|Video and telemetry| ground["Ground controller"]
 ```
 
-Capture, vision, tracking and guidance run on i.MX95 Linux.
+Linux hosts capture, vision, tracking, guidance and visual odometry.
 [Component details](src/README.md).
 
 ## Build
 
-Fetch the platform with [raven-manifest](https://github.com/Swamy-BV/raven-manifest/tree/develop):
+Fetch with [raven-manifest](https://github.com/Swamy-BV/raven-manifest/tree/develop):
 
 ```sh
 repo init -u https://github.com/Swamy-BV/raven-manifest.git -b develop -m raven.xml
