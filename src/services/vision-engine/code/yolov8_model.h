@@ -5,6 +5,7 @@
 
 #include <tensorflow/lite/c/c_api.h>
 
+#include "adapters/image/image_resizer.h"
 #include "detection.h"
 #include "rgb_input.h"
 
@@ -19,7 +20,8 @@ struct Letterbox {
 // EdgeFirst logical YOLOv8: uint8 NHWC input, normalized xywh and sigmoid
 // class scores in separate quantized channel-first output tensors.
 void ValidateYoloV8(TfLiteInterpreter* interpreter);
-Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter, const RgbLayout& image);
+Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter, const RgbLayout& image,
+                        ImageResizer& resizer);
 std::vector<detection::Box> DecodeYoloV8(const TfLiteInterpreter* interpreter,
                                          const Letterbox& geometry);
 }  // namespace raven::vision

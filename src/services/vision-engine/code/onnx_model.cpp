@@ -17,12 +17,11 @@
 #include <string>
 #include <vector>
 
-#include <gdk-pixbuf/gdk-pixbuf.h>
-#include <glib-object.h>
 #include <glib.h>
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>
 
+#include "adapters/image/image_resizer.h"
 #include "detection.h"
 #include "inference_worker.h"
 #include "rgb_input.h"
@@ -113,6 +112,7 @@ Tensor Signature(OrtSession* session, bool input, size_t index) {
 }
 
 class OnnxModel : public InferenceModel {
+  raven::vision::ImageResizer& resizer_;
   Ptr<OrtEnv> env_{nullptr, kApi->ReleaseEnv};
   Ptr<OrtSession> session_{nullptr, kApi->ReleaseSession};
   Ptr<OrtMemoryInfo> memory_{nullptr, kApi->ReleaseMemoryInfo};
@@ -165,8 +165,8 @@ class OnnxModel : public InferenceModel {
   // Arguments have distinct validated asset/option roles.
   // NOLINTBEGIN(bugprone-easily-swappable-parameters)
   OnnxModel(const char* file, const char* label_file, const char* kind,
-            int threads)
-      : adapter_(kind) {
+            int threads, raven::vision::ImageResizer& resizer)
+      : resizer_(resizer), adapter_(kind) {
     // NOLINTEND(bugprone-easily-swappable-parameters)
     Require(kApi != nullptr, "ONNX runtime API unavailable");
     auto start = Clock::now();
@@ -252,10 +252,10 @@ class OnnxModel : public InferenceModel {
     return geometry;
   }
 
-  void PackRow(const GdkPixbuf* image, int y, const Geometry& geometry,
+  void PackRow(const RgbLayout& image, int y, const Geometry& geometry,
                std::vector<float>& pixels) const {
-    const auto* source = gdk_pixbuf_read_pixels(image);
-    const int stride = gdk_pixbuf_get_rowstride(image);
+    const auto* source = image.source;
+    const int stride = image.stride;
     const bool raw_bgr = adapter_ == "yolox";
     for (int x = 0; x < geometry.rw; ++x) {
       for (int c = 0; c < 3; ++c) {
@@ -271,22 +271,12 @@ class OnnxModel : public InferenceModel {
 
   [[nodiscard]] std::vector<float> PrepareInput(
       const RgbLayout& rgb, const Geometry& geometry) const {
-    Ptr<GdkPixbuf> const image(
-        gdk_pixbuf_new_from_data(rgb.source, GDK_COLORSPACE_RGB, false,
-                                 kSmallGridStride, geometry.w, geometry.h,
-                                 rgb.stride, nullptr, nullptr),
-        g_object_unref);
-    Require(image != nullptr, "cannot wrap ONNX image");
-    Ptr<GdkPixbuf> const resized(
-        gdk_pixbuf_scale_simple(image.get(), geometry.rw, geometry.rh,
-                                GDK_INTERP_BILINEAR),
-        g_object_unref);
-    Require(resized != nullptr, "ONNX image resize failed");
+    const auto resized = resizer_.Resize(rgb, geometry.rw, geometry.rh);
     const float pad =
         adapter_ == "yolox" ? 114.0f : 114.0f / kPixelNormalizationDivisor;
     std::vector<float> pixels(static_cast<size_t>(width_) * height_ * 3, pad);
     for (int y = 0; y < geometry.rh; ++y) {
-      PackRow(resized.get(), y, geometry, pixels);
+      PackRow(resized, y, geometry, pixels);
     }
     return pixels;
   }
@@ -447,9 +437,8 @@ class OnnxModel : public InferenceModel {
 };
 }  // namespace
 
-std::unique_ptr<InferenceModel> MakeOnnxModel(const char* model,
-                                              const char* labels,
-                                              const char* adapter,
-                                              int threads) {
-  return std::make_unique<OnnxModel>(model, labels, adapter, threads);
+std::unique_ptr<InferenceModel> MakeOnnxModel(
+    const char* model, const char* labels, const char* adapter, int threads,
+    raven::vision::ImageResizer& resizer) {
+  return std::make_unique<OnnxModel>(model, labels, adapter, threads, resizer);
 }

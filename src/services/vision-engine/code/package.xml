@@ -13,5 +13,6 @@
   <depend>rcl_interfaces</depend>
   <depend>diagnostic_msgs</depend>
   <depend>vision_msgs</depend>
+  <depend>libopencv-dev</depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

@@ -15,6 +15,7 @@ DEPENDS = "\
     neutron-runtime \
     nlohmann-json \
     onnxruntime \
+    opencv \
     platform-contracts \
     rcl-interfaces \
     rclcpp \
@@ -30,6 +31,9 @@ SRC_URI = "\
     file://vision-engine.service \
     file://vision-engine.yaml \
 "
+
+# Preserve deployed interpolation until each model is qualified with a new backend.
+VISION_RESIZE_BACKEND ?= "legacy"
 
 ROS_BPN = "vision_engine"
 inherit ros_distro_jazzy ros_component ros_ament_cmake pkgconfig systemd useradd
@@ -59,6 +63,8 @@ RDEPENDS:${PN} = "\
     vision-engine-models \
     vision-msgs \
 "
+# OpenCV loads the compute ICD dynamically, outside automatic ELF dependencies.
+RDEPENDS:${PN}:append:imxmali = " mali-imx mali-imx-opencl-icd opencl-icd-loader"
 RDEPENDS:${PN}:append:mx95-nxp-bsp = " \
     model-yolov4-tiny-neutron \
     tensorflow-lite-neutron-delegate \
@@ -68,6 +74,7 @@ do_install:append() {
     install -D -m 0644 ${UNPACKDIR}/vision-engine.conf ${D}${sysconfdir}/vision-engine.conf
     install -D -m 0644 ${UNPACKDIR}/vision-engine.yaml ${D}${sysconfdir}/vision-engine.yaml
     install -D -m 0644 ${UNPACKDIR}/vision-engine.service ${D}${systemd_system_unitdir}/vision-engine.service
+    sed -i 's|@VISION_RESIZE_BACKEND@|${VISION_RESIZE_BACKEND}|g' ${D}${sysconfdir}/vision-engine.conf
     sed -i 's|@ROS_PREFIX@|${ros_prefix}|g' ${D}${systemd_system_unitdir}/vision-engine.service
     install -D -m 0644 ${UNPACKDIR}/vision-engine-tmpfiles.conf ${D}${nonarch_libdir}/tmpfiles.d/vision-engine.conf
 }

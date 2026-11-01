@@ -33,6 +33,7 @@
 #include <glib.h>
 #include <nlohmann/json.hpp>
 
+#include "../adapters/image/image_resizer.h"
 #include "../core/decode.h"
 #include "../core/frame.h"
 #include "../core/result.h"
@@ -153,12 +154,13 @@ static std::string Digest(const fs::path& file, size_t limit,
 struct Settings {
   fs::path registry, assets, demo, state;
 
+  std::string resize_backend;
   int frame_max_age;
   int threads, timeout;
 
   explicit Settings(const Json& j) {
     Keys(j, {"schema", "registry", "assets", "demo", "state", "threads",
-             "timeout_seconds", "frame_max_age_ms"});
+             "timeout_seconds", "frame_max_age_ms", "resize_backend"});
     if (j.at("schema") != 1) {
       Fail("unsupported configuration schema");
     }
@@ -169,6 +171,10 @@ struct Settings {
     frame_max_age = j.value("frame_max_age_ms", kDefaultFrameAgeMs);
     if (frame_max_age < kMinFrameAgeMs || frame_max_age > kMaxFrameAgeMs) {
       Fail("invalid frame age");
+    }
+    resize_backend = j.value("resize_backend", std::string("legacy"));
+    if (!raven::vision::IsResizeBackend(resize_backend)) {
+      Fail("resize_backend must be legacy, cpu or opencl");
     }
     threads = j.at("threads");
     timeout = j.at("timeout_seconds");
@@ -523,7 +529,7 @@ class Runner {
     resident_assets = validated_assets;
     for (const auto* field :
          {"predictions", "runtime", "backend", "worker_pid", "inference_count",
-          "preprocess_ms", "inference_ms", "model_load_ms"}) {
+          "preprocess_ms", "inference_ms", "model_load_ms", "resize_backend"}) {
       job[field] = result.at(field);
     }
     for (const auto* field : {"npu_partitions", "cpu_nodes"}) {
@@ -608,7 +614,7 @@ class Runner {
       if (selection || !runtime || !runtime->Ready()) {
         runtime = std::make_shared<ResidentWorker>(
             WorkerSettings{c.assets / m.file, c.assets / m.labels, m.adapter,
-                           m.backend, c.threads},
+                           m.backend, c.threads, c.resize_backend},
             deadline, cancel);
       }
       const auto result = EvaluateJob(input, runtime, deadline);
@@ -697,6 +703,10 @@ void AddMetrics(raven::vision::Snapshot& snapshot, const Json& job) {
     return;
   }
   snapshot.threshold = job.value("score_threshold", snapshot.threshold);
+  if (job.contains("resize_backend")) {
+    snapshot.metrics.emplace_back("resize_backend",
+                                  job.at("resize_backend").get<std::string>());
+  }
   for (const auto* key : {"preprocess_ms", "inference_ms", "model_load_ms",
                           "npu_partitions", "cpu_nodes"}) {
     if (job.contains(key)) {

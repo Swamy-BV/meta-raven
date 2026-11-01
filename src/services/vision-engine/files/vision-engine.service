@@ -38,11 +38,15 @@ RestrictSUIDSGID=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 DevicePolicy=closed
 DeviceAllow=/dev/neutron0 rw
+DeviceAllow=/dev/mali0 rw
 ReadWritePaths=-/run/lock/neutron.lock
 MemoryMax=512M
 TasksMax=64
 CPUQuota=200%
 Environment=OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2
+Environment=OPENCV_OPENCL_DEVICE=:GPU:
+Environment=OPENCV_OPENCL_RAISE_ERROR=true
+Environment=OPENCV_OPENCL_CACHE_DIR=/var/lib/vision-engine/opencl-cache
 
 [Install]
 WantedBy=multi-user.target

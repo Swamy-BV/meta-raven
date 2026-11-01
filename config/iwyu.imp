@@ -9,6 +9,8 @@
   { "include": [ "<tensorflow/lite/core/c/c_api.h>", "private", "<tensorflow/lite/c/c_api.h>", "public" ] },
   { "symbol": [ "gsize", "private", "<glib.h>", "public" ] },
   { "symbol": [ "gssize", "private", "<glib.h>", "public" ] },
+  { "include": [ "@[<\"]opencv2/core/mat[.]inl[.]hpp[>\"]", "private", "<opencv2/core/mat.hpp>", "public" ] },
+  { "include": [ "@[<\"]opencv2/core/matx[.]inl[.]hpp[>\"]", "private", "<opencv2/core/matx.hpp>", "public" ] },
   { "include": [ "@[<\"]nlohmann/.*[>\"]", "private", "<nlohmann/json.hpp>", "public" ] },
   { "include": [ "@[<\"]glib/.*[>\"]", "private", "<glib.h>", "public" ] },
   { "include": [ "@[<\"]gobject/.*[>\"]", "private", "<glib-object.h>", "public" ] },

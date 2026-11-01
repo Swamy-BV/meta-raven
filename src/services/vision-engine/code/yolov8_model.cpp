@@ -7,13 +7,12 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <stdexcept>
 #include <vector>
 
-#include <gdk-pixbuf/gdk-pixbuf.h>
-#include <glib-object.h>
 #include <tensorflow/lite/c/common.h>
+
+#include "adapters/image/image_resizer.h"
 
 namespace raven::vision {
 namespace {
@@ -25,7 +24,6 @@ constexpr int kCoordinates = 4;
 constexpr int kPadding = 114;
 constexpr float kInputScale = 1.0f / static_cast<float>(UCHAR_MAX);
 constexpr float kScaleTolerance = 1e-6f;
-using Pixbuf = std::unique_ptr<GdkPixbuf, decltype(&g_object_unref)>;
 
 void Require(const bool condition, const char* message) {
   if (!condition) {
@@ -66,7 +64,7 @@ QuantizedOutput Output(const TfLiteTensor* tensor) {
   return {values, TfLiteTensorQuantizationParams(tensor)};
 }
 
-void PackLetterbox(GdkPixbuf* resized, const Letterbox& geometry,
+void PackLetterbox(const RgbLayout& layout, const Letterbox& geometry,
                    TfLiteTensor* tensor) {
   constexpr auto kBytes =
       static_cast<size_t>(kDimension) * kDimension * kChannels;
@@ -75,9 +73,6 @@ void PackLetterbox(GdkPixbuf* resized, const Letterbox& geometry,
   auto* target = static_cast<uint8_t*>(TfLiteTensorData(tensor));
   Require(target != nullptr, "YOLOv8 input is not host accessible");
   std::fill_n(target, kBytes, kPadding);
-  const RgbLayout layout{gdk_pixbuf_read_pixels(resized), geometry.width,
-                         geometry.height, gdk_pixbuf_get_rowstride(resized),
-                         gdk_pixbuf_get_n_channels(resized)};
   Require(layout.channels == 3 || layout.channels == 4,
           "unsupported image channels");
   for (int y = 0; y < geometry.height; ++y) {
@@ -139,20 +134,14 @@ void ValidateYoloV8(TfLiteInterpreter* interpreter) {
   ValidateOutput(TfLiteInterpreterGetOutputTensor(interpreter, 1), kClasses);
 }
 
-Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter,
-                        const RgbLayout& image) {
+Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter, const RgbLayout& image,
+                        ImageResizer& resizer) {
   const auto width = image.width;
   const auto height = image.height;
   Require(image.source != nullptr &&
               (image.channels == 3 || image.channels == 4) &&
               image.stride >= width * image.channels,
           "invalid YOLOv8 RGB layout");
-  const Pixbuf source(
-      gdk_pixbuf_new_from_data(image.source, GDK_COLORSPACE_RGB,
-                               image.channels == 4, CHAR_BIT, width, height,
-                               image.stride, nullptr, nullptr),
-      g_object_unref);
-  Require(source != nullptr, "cannot wrap YOLOv8 RGB image");
   Require(width > 0 && height > 0, "invalid YOLOv8 source dimensions");
   const auto scale = std::min(static_cast<double>(kDimension) / width,
                               static_cast<double>(kDimension) / height);
@@ -163,13 +152,8 @@ Letterbox PrepareYoloV8(TfLiteInterpreter* interpreter,
   const Letterbox geometry{resized_width, resized_height,
                            (kDimension - resized_width) / 2,
                            (kDimension - resized_height) / 2};
-  Pixbuf resized(nullptr, g_object_unref);
-  if (resized_width != width || resized_height != height) {
-    resized.reset(gdk_pixbuf_scale_simple(source.get(), resized_width,
-                                          resized_height, GDK_INTERP_BILINEAR));
-    Require(resized != nullptr, "YOLOv8 letterbox resize failed");
-  }
-  PackLetterbox(resized ? resized.get() : source.get(), geometry,
+  const auto resized = resizer.Resize(image, resized_width, resized_height);
+  PackLetterbox(resized, geometry,
                 TfLiteInterpreterGetInputTensor(interpreter, 0));
   return geometry;
 }

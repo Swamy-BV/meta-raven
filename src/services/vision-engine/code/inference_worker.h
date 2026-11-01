@@ -13,6 +13,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "adapters/image/image_resizer.h"
 #include "rgb_input.h"
 #include "worker_frame_buffer.h"
 
@@ -30,9 +31,9 @@ class InferenceModel {
 
 std::vector<uint8_t> LoadRgbImage(const std::filesystem::path& image,
                                   int& width, int& height);
-std::unique_ptr<InferenceModel> MakeOnnxModel(const char* model,
-                                              const char* labels,
-                                              const char* adapter, int threads);
+std::unique_ptr<InferenceModel> MakeOnnxModel(
+    const char* model, const char* labels, const char* adapter, int threads,
+    raven::vision::ImageResizer& resizer);
 
 struct WorkerSettings {
   std::filesystem::path model;
@@ -40,6 +41,7 @@ struct WorkerSettings {
   std::string task;
   std::string backend;
   int threads = 1;
+  std::string resize_backend = "legacy";
 };
 
 // A persistent, isolated interpreter. Only the job thread performs exchanges.
@@ -80,5 +82,4 @@ class ResidentWorker {
                           std::atomic<bool>& cancel);
 };
 
-int InferenceWorker(const char* model, const char* labels, const char* task,
-                    const char* backend, int threads);
+int InferenceWorker(const WorkerSettings& settings);

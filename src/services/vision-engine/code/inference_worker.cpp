@@ -35,6 +35,7 @@
 #include <tensorflow/lite/c/c_api.h>
 #include <tensorflow/lite/c/common.h>
 
+#include "adapters/image/image_resizer.h"
 #include "detection.h"
 #include "neutron_backend.h"
 #include "rgb_input.h"
@@ -118,7 +119,7 @@ void ResidentWorker::Terminate() {
 ResidentWorker::~ResidentWorker() { Terminate(); }
 
 struct SpawnArguments {
-  std::string model, labels, task, backend, threads;
+  std::string model, labels, task, backend, threads, resize_backend;
   int frame_descriptor = -1;
 };
 
@@ -153,7 +154,7 @@ static void ExecChild(const SpawnArguments& args, const int (&in)[2],
   // Fixed executable and argv; no shell or configurable plugin path.
   execl("/proc/self/exe", "vision-engine", "--inference-worker",
         args.model.c_str(), args.labels.c_str(), args.task.c_str(),
-        args.backend.c_str(), args.threads.c_str(),
+        args.backend.c_str(), args.threads.c_str(), args.resize_backend.c_str(),
         static_cast<char*>(nullptr));
   _exit(kExecFailureExitCode);
 }
@@ -174,9 +175,13 @@ ResidentWorker::ResidentWorker(const WorkerSettings& settings,
     close(in[1]);
     throw std::runtime_error("cannot create worker output pipe");
   }
-  const SpawnArguments args{
-      model.string(), labels.string(),         task,
-      backend,        std::to_string(threads), frames_.ReadDescriptor()};
+  const SpawnArguments args{model.string(),
+                            labels.string(),
+                            task,
+                            backend,
+                            std::to_string(threads),
+                            settings.resize_backend,
+                            frames_.ReadDescriptor()};
   pid_t const parent = getpid();
   pid_ = fork();
   if (pid_ == 0) {
@@ -396,6 +401,7 @@ struct OptionsDelete {
 };
 
 class Classifier : public InferenceModel {
+  raven::vision::ImageResizer& resizer_;
   std::unique_ptr<NeutronBackend> neutron_;
   std::unique_ptr<TfLiteModel, ModelDelete> model_;
   std::unique_ptr<TfLiteInterpreter, InterpreterDelete> interpreter_;
@@ -550,11 +556,14 @@ class Classifier : public InferenceModel {
   }
 
  public:
-  // Arguments have distinct validated asset/option roles.
-  // NOLINTBEGIN(bugprone-easily-swappable-parameters)
-  Classifier(const char* file, const char* label_file, const char* task,
-             const char* backend, int threads) {
-    // NOLINTEND(bugprone-easily-swappable-parameters)
+  Classifier(const WorkerSettings& settings,
+             raven::vision::ImageResizer& resizer)
+      : resizer_(resizer) {
+    const auto* file = settings.model.c_str();
+    const auto* label_file = settings.labels.c_str();
+    const auto* task = settings.task.c_str();
+    const auto* backend = settings.backend.c_str();
+    const auto threads = settings.threads;
     Require(std::string(task) == "classification" ||
                 std::string(task) == "detection" ||
                 std::string(task) == "yolov4-tiny" ||
@@ -625,27 +634,28 @@ class Classifier : public InferenceModel {
   void PrepareTensor(const Pixbuf& decoded) {
     if (yolo8_) {
       letterbox_ = raven::vision::PrepareYoloV8(
-          interpreter_.get(), {gdk_pixbuf_read_pixels(decoded.get()),
-                               gdk_pixbuf_get_width(decoded.get()),
-                               gdk_pixbuf_get_height(decoded.get()),
-                               gdk_pixbuf_get_rowstride(decoded.get()),
-                               gdk_pixbuf_get_n_channels(decoded.get())});
+          interpreter_.get(),
+          {gdk_pixbuf_read_pixels(decoded.get()),
+           gdk_pixbuf_get_width(decoded.get()),
+           gdk_pixbuf_get_height(decoded.get()),
+           gdk_pixbuf_get_rowstride(decoded.get()),
+           gdk_pixbuf_get_n_channels(decoded.get())},
+          resizer_);
       return;
     }
-    Pixbuf const resized(gdk_pixbuf_scale_simple(decoded.get(), width_, height_,
-                                                 GDK_INTERP_BILINEAR),
-                         g_object_unref);
-    Require(resized != nullptr, "image resize failed");
-    const auto* pixels = gdk_pixbuf_read_pixels(resized.get());
-    int const stride = gdk_pixbuf_get_rowstride(resized.get());
-    int const channels = gdk_pixbuf_get_n_channels(resized.get());
-    Require(channels == 3 || channels == 4, "unsupported image channels");
+    const auto resized =
+        resizer_.Resize({gdk_pixbuf_read_pixels(decoded.get()),
+                         gdk_pixbuf_get_width(decoded.get()),
+                         gdk_pixbuf_get_height(decoded.get()),
+                         gdk_pixbuf_get_rowstride(decoded.get()),
+                         gdk_pixbuf_get_n_channels(decoded.get())},
+                        width_, height_);
     auto* tensor = TfLiteInterpreterGetInputTensor(interpreter_.get(), 0);
     Require(TfLiteTensorByteSize(tensor) ==
                 static_cast<size_t>(width_) * height_ * 3,
             "input tensor size changed");
-    PackRgbTensor({pixels, width_, height_, stride, channels},
-                  static_cast<uint8_t*>(TfLiteTensorData(tensor)), yolo4_);
+    PackRgbTensor(resized, static_cast<uint8_t*>(TfLiteTensorData(tensor)),
+                  yolo4_);
   }
 
   struct YoloCell {
@@ -895,7 +905,8 @@ static Json ProcessRequest(InferenceModel& classifier,
 
 static int WorkerLoop(InferenceModel& classifier,
                       const WorkerFrameBuffer& frames,
-                      const std::function<bool(const Json&)>& send) {
+                      const std::function<bool(const Json&)>& send,
+                      const std::string& resize_backend) {
   // Bounded framing, including malformed or partial input from a supervisor.
   for (;;) {
     std::string line;
@@ -910,6 +921,7 @@ static int WorkerLoop(InferenceModel& classifier,
     Json reply;
     try {
       reply = ProcessRequest(classifier, frames, line);
+      reply["resize_backend"] = resize_backend;
     } catch (const std::exception& e) {
       reply = {{"ok", false}, {"error", e.what()}};
     }
@@ -919,8 +931,7 @@ static int WorkerLoop(InferenceModel& classifier,
   }
 }
 
-int InferenceWorker(const char* model, const char* labels, const char* task,
-                    const char* backend, int threads) {
+int InferenceWorker(const WorkerSettings& settings) {
   // Vendor delegates log to stdout. Keep the supervisor pipe JSON-only.
   int const protocol_fd = dup(STDOUT_FILENO);
   if (protocol_fd < 0 || dup2(STDERR_FILENO, STDOUT_FILENO) < 0) {
@@ -940,21 +951,26 @@ int InferenceWorker(const char* model, const char* labels, const char* task,
   };
   try {
     const WorkerFrameBuffer frames(WorkerFrameBuffer::kInheritedDescriptor);
+    const auto threads = settings.threads;
+    const auto* model = settings.model.c_str();
+    const auto* labels = settings.labels.c_str();
+    const auto* task = settings.task.c_str();
+    const auto* backend = settings.backend.c_str();
     Require(threads >= 1 && threads <= 4, "invalid thread count");
+    raven::vision::ImageResizer resizer(settings.resize_backend);
     std::unique_ptr<InferenceModel> classifier;
     if (std::string(task) == "yolox" || std::string(task) == "yolov6" ||
         std::string(task) == "yolov7") {
       Require(std::string(backend) == "cpu",
               "ONNX adapter requires CPU backend");
-      classifier = MakeOnnxModel(model, labels, task, threads);
+      classifier = MakeOnnxModel(model, labels, task, threads, resizer);
     } else {
-      classifier =
-          std::make_unique<Classifier>(model, labels, task, backend, threads);
+      classifier = std::make_unique<Classifier>(settings, resizer);
     }
     if (!send(Json({{"ok", true}}))) {
       return 1;
     }
-    return WorkerLoop(*classifier, frames, send);
+    return WorkerLoop(*classifier, frames, send, resizer.Backend());
   } catch (const std::exception& e) {
     send(Json({{"ok", false}, {"error", e.what()}}));
     return 1;

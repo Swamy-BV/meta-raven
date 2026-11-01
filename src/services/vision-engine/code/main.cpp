@@ -4,6 +4,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -16,10 +17,23 @@
 #include "inference_worker.h"
 
 namespace {
-constexpr auto kWorkerArgumentCount = 7;
+constexpr auto kWorkerArgumentCount = 8;
+constexpr auto kResizeBackendArgument = 7;
 constexpr auto kBackendArgument = 5;
 constexpr auto kThreadsArgument = 6;
 constexpr auto kPrivateFileUmask = 0077;
+
+WorkerSettings ParseWorkerSettings(int argc, const char* const* argv) {
+  if (argc != kWorkerArgumentCount) {
+    throw std::invalid_argument("invalid inference-worker argument count");
+  }
+  return {argv[2],
+          argv[3],
+          argv[4],
+          argv[kBackendArgument],
+          std::stoi(argv[kThreadsArgument]),
+          argv[kResizeBackendArgument]};
+}
 
 void ConfigureProcess() {
   std::signal(SIGPIPE, SIG_IGN);
@@ -36,10 +50,8 @@ void ConfigureProcess() {
 
 int main(int argc, char** argv) {
   try {
-    if (argc == kWorkerArgumentCount &&
-        std::string(argv[1]) == "--inference-worker") {
-      return InferenceWorker(argv[2], argv[3], argv[4], argv[kBackendArgument],
-                             std::stoi(argv[kThreadsArgument]));
+    if (argc > 1 && std::string(argv[1]) == "--inference-worker") {
+      return InferenceWorker(ParseWorkerSettings(argc, argv));
     }
     ConfigureProcess();
     rclcpp::init(argc, argv);
