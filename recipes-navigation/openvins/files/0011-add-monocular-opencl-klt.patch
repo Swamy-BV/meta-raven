@@ -1,0 +1,199 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Add an opt-in monocular OpenCL feature tracking path
+
+Keep the default CPU path and filter mathematics unchanged.
+OpenCL selection requires a GPU runtime and does not silently select a CPU device.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_core/src/track/TrackKLT.h
++++ b/ov_core/src/track/TrackKLT.h
+@@ -23,6 +23,7 @@
+ #define OV_CORE_TRACK_KLT_H
+ 
+ #include "TrackBase.h"
++#include <opencv2/core/ocl.hpp>
+ 
+ namespace ov_core {
+ 
+@@ -50,10 +51,11 @@
+    * @param gridx size of grid in the x-direction / u-direction
+    * @param gridy size of grid in the y-direction / v-direction
+    * @param minpxdist features need to be at least this number pixels away from each other
++   * @param opencl require GPU-backed preprocessing and LK for one monocular camera
+    */
+   explicit TrackKLT(std::unordered_map<size_t, std::shared_ptr<CamBase>> cameras, int numfeats, int numaruco, bool stereo,
+-                    HistogramMethod histmethod, int fast_threshold, int gridx, int gridy, int minpxdist)
+-      : TrackBase(cameras, numfeats, numaruco, stereo, histmethod), threshold(fast_threshold), grid_x(gridx), grid_y(gridy),
++                    HistogramMethod histmethod, int fast_threshold, int gridx, int gridy, int minpxdist, bool opencl = false)
++      : TrackBase(cameras, numfeats, numaruco, stereo, histmethod), use_opencl(opencl), threshold(fast_threshold), grid_x(gridx), grid_y(gridy),
+         min_px_dist(minpxdist) {}
+ 
+   /**
+@@ -131,6 +133,17 @@
+   void perform_matching(const std::vector<cv::Mat> &img0pyr, const std::vector<cv::Mat> &img1pyr, std::vector<cv::KeyPoint> &pts0,
+                         std::vector<cv::KeyPoint> &pts1, size_t id0, size_t id1, std::vector<uchar> &mask_out);
+ 
++  // GPU images survive across frames. CPU copies serve the grid detector and
++  // visualization; OpenCL LK builds its own pyramids rather than reading Mat pyramids.
++  bool use_opencl = false;
++  bool opencl_announced = false;
++  cv::ocl::OpenCLExecutionContext opencl_context;
++  std::map<size_t, cv::UMat> img_opencl_curr;
++  std::map<size_t, cv::UMat> img_opencl_last;
++
++  void prepare_opencl_image(const cv::Mat &input, size_t cam_id, cv::Mat &image,
++                            std::vector<cv::Mat> &pyramid);
++
+   // Parameters for our FAST grid detector
+   int threshold;
+   int grid_x;
+--- a/ov_core/src/track/TrackKLT.cpp
++++ b/ov_core/src/track/TrackKLT.cpp
+@@ -21,6 +21,10 @@
+ 
+ #include "TrackKLT.h"
+ 
++#include <stdexcept>
++#include <optional>
++#include <opencv2/core/ocl.hpp>
++
+ #include "Grider_FAST.h"
+ #include "Grider_GRID.h"
+ #include "cam/CamBase.h"
+@@ -42,6 +46,30 @@
+     std::exit(EXIT_FAILURE);
+   }
+ 
++  std::optional<cv::ocl::OpenCLExecutionContextScope> opencl_scope;
++  if (use_opencl) {
++    if (message.images.size() != 1 || camera_calib.size() != 1 || use_stereo)
++      throw std::runtime_error("OpenCL KLT currently requires one monocular camera");
++    // ROS may replace its worker between frames. Retain the device context and
++    // queue, then bind them to each serial tracking worker instead of recreating them.
++    if (opencl_context.empty()) {
++      cv::ocl::setUseOpenCL(true);
++      if (!cv::ocl::useOpenCL())
++        throw std::runtime_error("OpenCL KLT requires an accessible GPU runtime");
++      opencl_context = cv::ocl::OpenCLExecutionContext::getCurrent();
++    }
++    opencl_scope.emplace(opencl_context);
++    cv::ocl::setUseOpenCL(true);
++    const auto &device = cv::ocl::Device::getDefault();
++    if (!cv::ocl::useOpenCL() || !(device.type() & cv::ocl::Device::TYPE_GPU) || !device.imageSupport() ||
++        !cv::ocl::Image2D::isFormatSupported(CV_32F, 1, false))
++      throw std::runtime_error("OpenCL KLT requires an accessible GPU with image support");
++    if (!opencl_announced) {
++      PRINT_INFO("[KLT]: OpenCL GPU backend: %s (%s)\n", device.name().c_str(), device.version().c_str());
++      opencl_announced = true;
++    }
++  }
++
+   // Preprocessing steps that we do not parallelize
+   // NOTE: DO NOT PARALLELIZE THESE!
+   // NOTE: These seem to be much slower if you parallelize them...
+@@ -52,6 +80,15 @@
+     // Lock this data feed for this camera
+     size_t cam_id = message.sensor_ids.at(msg_id);
+     std::lock_guard<std::mutex> lck(mtx_feeds.at(cam_id));
++
++    if (use_opencl) {
++      cv::Mat image;
++      std::vector<cv::Mat> pyramid;
++      prepare_opencl_image(message.images.at(msg_id), cam_id, image, pyramid);
++      img_curr[cam_id] = image;
++      img_pyramid_curr[cam_id] = pyramid;
++      continue;
++    }
+ 
+     // Histogram equalize
+     cv::Mat img;
+@@ -93,6 +130,24 @@
+   }
+ }
+ 
++void TrackKLT::prepare_opencl_image(const cv::Mat &input, size_t cam_id, cv::Mat &image,
++                                    std::vector<cv::Mat> &pyramid) {
++  cv::UMat uploaded, prepared;
++  input.copyTo(uploaded);
++  if (histogram_method == HistogramMethod::HISTOGRAM) {
++    cv::equalizeHist(uploaded, prepared);
++  } else if (histogram_method == HistogramMethod::CLAHE) {
++    cv::createCLAHE(10.0, cv::Size(8, 8))->apply(uploaded, prepared);
++  } else {
++    prepared = uploaded;
++  }
++  // Keep the GPU buffer resident for LK. An owned CPU image avoids leaving a
++  // mapped UMat alive while a GPU kernel needs the same allocation.
++  prepared.copyTo(image);
++  pyramid = {image};
++  img_opencl_curr[cam_id] = prepared;
++}
++
+ void TrackKLT::feed_monocular(const CameraData &message, size_t msg_id) {
+ 
+   // Lock this data feed for this camera
+@@ -116,6 +171,8 @@
+     std::lock_guard<std::mutex> lckv(mtx_last_vars);
+     img_last[cam_id] = img;
+     img_pyramid_last[cam_id] = imgpyr;
++    if (use_opencl)
++      img_opencl_last[cam_id] = img_opencl_curr.at(cam_id);
+     img_mask_last[cam_id] = mask;
+     pts_last[cam_id] = good_left;
+     ids_last[cam_id] = good_ids_left;
+@@ -144,6 +201,8 @@
+     std::lock_guard<std::mutex> lckv(mtx_last_vars);
+     img_last[cam_id] = img;
+     img_pyramid_last[cam_id] = imgpyr;
++    if (use_opencl)
++      img_opencl_last[cam_id] = img_opencl_curr.at(cam_id);
+     img_mask_last[cam_id] = mask;
+     pts_last[cam_id].clear();
+     ids_last[cam_id].clear();
+@@ -183,6 +242,8 @@
+     std::lock_guard<std::mutex> lckv(mtx_last_vars);
+     img_last[cam_id] = img;
+     img_pyramid_last[cam_id] = imgpyr;
++    if (use_opencl)
++      img_opencl_last[cam_id] = img_opencl_curr.at(cam_id);
+     img_mask_last[cam_id] = mask;
+     pts_last[cam_id] = good_left;
+     ids_last[cam_id] = good_ids_left;
+@@ -855,7 +916,34 @@
+   std::vector<uchar> mask_klt;
+   std::vector<float> error;
+   cv::TermCriteria term_crit = cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 30, 0.01);
+-  cv::calcOpticalFlowPyrLK(img0pyr, img1pyr, pts0, pts1, mask_klt, error, win_size, pyr_levels, term_crit, cv::OPTFLOW_USE_INITIAL_FLOW);
++  if (use_opencl) {
++    const auto &previous = img_opencl_last.at(id0);
++    const auto &current = img_opencl_curr.at(id1);
++    if (previous.size() != current.size() || previous.type() != CV_8UC1 || current.type() != CV_8UC1)
++      throw std::runtime_error("OpenCL KLT requires equal-sized mono8 image pairs");
++    const cv::Mat previous_points(pts0);
++    cv::UMat next_points, status, errors;
++    cv::Mat(pts1).copyTo(next_points);
++    // Match buildOpticalFlowPyramid's small-image stopping condition.
++    int levels = 0;
++    for (cv::Size size = previous.size(); levels < pyr_levels; ++levels) {
++      size = cv::Size((size.width + 1) / 2, (size.height + 1) / 2);
++      if (size.width <= win_size.width || size.height <= win_size.height)
++        break;
++    }
++    cv::calcOpticalFlowPyrLK(previous, current, previous_points, next_points,
++                            status, errors, win_size, levels, term_crit, cv::OPTFLOW_USE_INITIAL_FLOW);
++    cv::Mat next_cpu, status_cpu;
++    next_points.copyTo(next_cpu);
++    status.copyTo(status_cpu);
++    if (next_cpu.total() != pts0.size() || status_cpu.total() != pts0.size())
++      throw std::runtime_error("OpenCL KLT returned inconsistent track arrays");
++    pts1.assign(next_cpu.ptr<cv::Point2f>(), next_cpu.ptr<cv::Point2f>() + next_cpu.total());
++    mask_klt.assign(status_cpu.ptr<uchar>(), status_cpu.ptr<uchar>() + status_cpu.total());
++  } else {
++    cv::calcOpticalFlowPyrLK(img0pyr, img1pyr, pts0, pts1, mask_klt, error, win_size, pyr_levels, term_crit,
++                            cv::OPTFLOW_USE_INITIAL_FLOW);
++  }
+ 
+   // Normalize these points, so we can then do ransac
+   // We don't want to do ransac on distorted image uvs since the mapping is nonlinear

@@ -1,0 +1,62 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Select the KLT execution backend through estimator configuration
+
+Keep the default CPU path and filter mathematics unchanged.
+OpenCL selection requires a GPU runtime and does not silently select a CPU device.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/core/VioManagerOptions.h
++++ b/ov_msckf/src/core/VioManagerOptions.h
+@@ -27,6 +27,7 @@
+ #include <memory>
+ #include <sstream>
+ #include <string>
++#include <stdexcept>
+ #include <vector>
+ 
+ #include "state/StateOptions.h"
+@@ -399,6 +400,9 @@
+   /// If we should use KLT tracking, or descriptor matcher
+   bool use_klt = true;
+ 
++  // Opt-in GPU frontend; state estimation and geometric rejection remain on CPU.
++  bool klt_use_opencl = false;
++
+   /// If should extract aruco tags and estimate them
+   bool use_aruco = true;
+ 
+@@ -457,6 +461,13 @@
+     if (parser != nullptr) {
+       parser->parse_config("use_stereo", use_stereo);
+       parser->parse_config("use_klt", use_klt);
++      std::string backend = "cpu";
++      parser->parse_config("klt_backend", backend, false);
++      if (backend != "cpu" && backend != "opencl")
++        throw std::runtime_error("klt_backend must be cpu or opencl");
++      klt_use_opencl = backend == "opencl";
++      if (klt_use_opencl && (!use_klt || use_stereo || state_options.num_cameras != 1))
++        throw std::runtime_error("OpenCL KLT requires KLT tracking with one monocular camera");
+       parser->parse_config("use_aruco", use_aruco);
+       parser->parse_config("downsize_aruco", downsize_aruco);
+       parser->parse_config("downsample_cameras", downsample_cameras);
+@@ -490,6 +501,7 @@
+     PRINT_DEBUG("FEATURE TRACKING PARAMETERS:\n");
+     PRINT_DEBUG("  - use_stereo: %d\n", use_stereo);
+     PRINT_DEBUG("  - use_klt: %d\n", use_klt);
++    PRINT_INFO("  - klt_backend: %s\n", klt_use_opencl ? "opencl" : "cpu");
+     PRINT_DEBUG("  - use_aruco: %d\n", use_aruco);
+     PRINT_DEBUG("  - downsize aruco: %d\n", downsize_aruco);
+     PRINT_DEBUG("  - downsize cameras: %d\n", downsample_cameras);
+--- a/ov_msckf/src/core/VioManager.cpp
++++ b/ov_msckf/src/core/VioManager.cpp
+@@ -137,7 +137,7 @@
+   if (params.use_klt) {
+     trackFEATS = std::shared_ptr<TrackBase>(new TrackKLT(state->_cam_intrinsics_cameras, init_max_features,
+                                                          state->_options.max_aruco_features, params.use_stereo, params.histogram_method,
+-                                                         params.fast_threshold, params.grid_x, params.grid_y, params.min_px_dist));
++                                                         params.fast_threshold, params.grid_x, params.grid_y, params.min_px_dist, params.klt_use_opencl));
+   } else {
+     trackFEATS = std::shared_ptr<TrackBase>(new TrackDescriptor(
+         state->_cam_intrinsics_cameras, init_max_features, state->_options.max_aruco_features, params.use_stereo, params.histogram_method,

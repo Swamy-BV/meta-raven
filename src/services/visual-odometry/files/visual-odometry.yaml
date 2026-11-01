@@ -8,6 +8,8 @@
     save_total_state: false
     # media-capture owns colour conversion; reject accidental colour input.
     require_mono8: true
+    # OpenCL reduces CPU use but has higher frame latency at this workload.
+    klt_backend: cpu
     # Slow flight can resemble rest; never apply stationary updates after motion.
     zupt_only_at_beginning: true
     # Small image disparity must not override inertial evidence of motion.
@@ -16,6 +18,8 @@
     use_stereo: false
     path_gt: ""
     num_opencv_threads: 2
+    # Keep IMU ingestion responsive while a camera update runs.
+    multi_threading_subs: true
     init_dyn_mle_max_threads: 2
     executor_threads: 2
     imu_queue_depth: 200

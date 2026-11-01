@@ -15,6 +15,9 @@ Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
 Environment=OMP_NUM_THREADS=2
 Environment=OPENBLAS_NUM_THREADS=1
+Environment=OPENCV_OPENCL_DEVICE=:GPU:
+Environment=OPENCV_OPENCL_RAISE_ERROR=true
+Environment=OPENCV_OPENCL_CACHE_DIR=/var/lib/visual-odometry/opencl-cache
 EnvironmentFile=/etc/ros/ros2.env
 ExecStart=@ROS_PREFIX@/lib/ov_msckf/run_subscribe_msckf \
     --ros-args --params-file /etc/visual-odometry/ros.yaml \
@@ -35,7 +38,11 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 PrivateTmp=yes
-PrivateDevices=yes
+PrivateDevices=no
+# Vendor OpenCL uses the compute node directly; keep other devices restricted.
+SupplementaryGroups=video
+DevicePolicy=closed
+DeviceAllow=/dev/mali0 rw
 RestrictSUIDSGID=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 MemoryMax=1G

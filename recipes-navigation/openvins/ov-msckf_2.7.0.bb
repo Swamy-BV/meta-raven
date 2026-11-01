@@ -30,6 +30,8 @@ SRC_URI += "\
     file://0008-bound-optional-visualization.patch;patchdir=.. \
     file://0009-publish-stationary-initialized-odometry.patch;patchdir=.. \
     file://0010-require-prepared-monochrome-input.patch;patchdir=.. \
+    file://0012-select-opencl-klt-backend.patch;patchdir=.. \
+    file://0013-synchronize-clone-history-and-honor-threading.patch;patchdir=.. \
 "
 
 # Keep the feature-level simulator out of the normal runtime installation.

@@ -1,0 +1,53 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Honor configured update threading and synchronize clone writes
+
+The ROS executable unconditionally overrides multi_threading_subs after parsing.
+Respect the requested synchronous mode instead. With asynchronous updates,
+State::margtimestep() can run during clone insertion or ZUPT clone removal;
+its reader lock must also protect those writes. Normal marginalization already
+uses this mutex. A captured A55 core stopped in std::_Rb_tree_increment while
+the IMU callback traversed this map during a camera update.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/run_subscribe_msckf.cpp
++++ b/ov_msckf/src/run_subscribe_msckf.cpp
+@@ -83,7 +83,6 @@
+   // Create our VIO system
+   VioManagerOptions params;
+   params.print_and_load(parser);
+-  params.use_multi_threading_subs = true;
+   sys = std::make_shared<VioManager>(params);
+ #if ROS_AVAILABLE == 1
+   viz = std::make_shared<ROS1Visualizer>(nh, sys);
+--- a/ov_msckf/src/state/StateHelper.cpp
++++ b/ov_msckf/src/state/StateHelper.cpp
+@@ -596,7 +596,11 @@
+   }
+ 
+   // Append the new clone to our clone vector
+-  state->_clones_IMU[state->_timestamp] = pose;
++  {
++    // margtimestep() reads this map from the IMU callback.
++    std::lock_guard<std::mutex> lock(state->_mutex_state);
++    state->_clones_IMU[state->_timestamp] = pose;
++  }
+ 
+   // If we are doing time calibration, then our clones are a function of the time offset
+   // Logic is based on Mingyang Li and Anastasios I. Mourikis paper:
+--- a/ov_msckf/src/update/UpdaterZeroVelocity.cpp
++++ b/ov_msckf/src/update/UpdaterZeroVelocity.cpp
+@@ -320,7 +320,11 @@
+     // finally update and remove the old clone
+     StateHelper::EKFUpdate(state, Hx_order, H, res, R);
+     StateHelper::marginalize(state, state->_clones_IMU.at(time1_cam));
+-    state->_clones_IMU.erase(time1_cam);
++    {
++      // Use the same lock as margtimestep() for every clone-map mutation.
++      std::lock_guard<std::mutex> lock(state->_mutex_state);
++      state->_clones_IMU.erase(time1_cam);
++    }
+   }
+ 
+   // Finally return

@@ -49,6 +49,13 @@ IMAGE_INSTALL:append = " \
     px4-odometry \
 "
 
+# OpenCV loads the compute ICD dynamically; keep the complete headless runtime.
+IMAGE_INSTALL:append:imxmali = "\
+    mali-imx \
+    mali-imx-opencl-icd \
+    opencl-icd-loader \
+"
+
 # Publish a block map with the compressed factory WIC for bmaptool and UUU.
 # The SWU bundle consumes the standalone filesystem image, not the factory WIC.
 IMAGE_FSTYPES:append = " wic.bmap ext4.gz"

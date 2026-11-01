@@ -1,6 +1,6 @@
 {
   "replacements": {
-    "machines": ["raven-frdm-imx95", "mx95-nxp-bsp"],
+    "machines": ["raven-frdm-imx95", "mx95-nxp-bsp", "imxmali"],
     "distros": ["raven"]
   },
   "images": {

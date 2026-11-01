@@ -10,6 +10,8 @@ DEPENDS = "\
 "
 require openvins.inc
 
+SRC_URI += "file://0011-add-monocular-opencl-klt.patch;patchdir=.."
+
 RDEPENDS:${PN} += "\
     cv-bridge \
     rclcpp \
