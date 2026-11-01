@@ -43,33 +43,47 @@ std::string RtpSource(const Source& source) {
          "v4l2h264dec capture-io-mode=dmabuf";
 }
 
+std::string LibcameraSource(const Settings& settings) {
+  auto graph = std::string("libcamerasrc name=camera src::stream-role=") +
+               (settings.mode == "photo" ? "still-capture" : "video-recording");
+  if (!settings.source.camera_name.empty()) {
+    graph += " camera-name=" + Quote(settings.source.camera_name);
+  }
+  // Request the sensor rate explicitly; videorate only drops downstream
+  // frames.
+  const auto fps =
+      std::max({settings.image.fps, settings.preview.fps, settings.video.fps,
+                settings.navigation_enabled ? settings.navigation.fps : 0});
+  graph += " ! video/x-raw,format=NV12,framerate=" + std::to_string(fps) + "/1";
+  if (settings.source.width > 0 && settings.source.height > 0) {
+    graph += ",width=" + std::to_string(settings.source.width) +
+             ",height=" + std::to_string(settings.source.height);
+  }
+  return graph;
+}
+
+std::string RosSource(const Settings& settings) {
+  // The i.MX95 DPU does not accept packed BGR. videoconvert only normalizes
+  // unsupported input formats here; RGB/mono8 negotiate passthrough. Physical
+  // NV12 capture and decoding do not enter this ROS-only adapter.
+  return std::string(
+             "appsrc name=ros_input is-live=true format=time block=false "
+             "max-buffers=2 leaky-type=downstream do-timestamp=true") +
+         (settings.converter == "g2d"
+              ? " ! videoconvert ! video/x-raw,format=(string){RGB,GRAY8}"
+              : "");
+}
+
 std::string SourceGraph(const Settings& settings) {
   const auto& source = settings.source;
   if (source.kind == "test") {
     return "videotestsrc is-live=true pattern=ball";
   }
   if (source.kind == "ros") {
-    return "appsrc name=ros_input is-live=true format=time block=false "
-           "max-buffers=2 leaky-type=downstream do-timestamp=true";
+    return RosSource(settings);
   }
   if (source.kind == "libcamera") {
-    auto graph =
-        std::string("libcamerasrc name=camera src::stream-role=") +
-        (settings.mode == "photo" ? "still-capture" : "video-recording");
-    if (!source.camera_name.empty()) {
-      graph += " camera-name=" + Quote(source.camera_name);
-    }
-    // Request the sensor rate explicitly; videorate only drops downstream
-    // frames.
-    const auto fps = std::max(
-        {settings.image.fps, settings.preview.fps, settings.video.fps});
-    graph +=
-        " ! video/x-raw,format=NV12,framerate=" + std::to_string(fps) + "/1";
-    if (source.width > 0 && source.height > 0) {
-      graph += ",width=" + std::to_string(source.width) +
-               ",height=" + std::to_string(source.height);
-    }
-    return graph;
+    return LibcameraSource(settings);
   }
   if (source.kind == "camera") {
     return "v4l2src do-timestamp=true device=" + Quote(source.uri) +
@@ -100,7 +114,7 @@ std::string Convert(const Settings& settings, const Profile& profile,
                     const std::string& format) {
   return std::string(settings.converter == "g2d"
                          ? "imxvideoconvert_g2d"
-                         : "videoconvert ! videoscale") +
+                         : "videoconvert ! videoscale add-borders=false") +
          " ! video/x-raw,format=" + format +
          ",width=" + std::to_string(profile.width) +
          ",height=" + std::to_string(profile.height);
@@ -109,6 +123,19 @@ std::string Convert(const Settings& settings, const Profile& profile,
 std::string Queue() {
   return " ! queue leaky=downstream max-size-buffers=2 "
          "max-size-bytes=0 max-size-time=0 ! ";
+}
+
+std::string NavigationGraph(const Settings& settings) {
+  if (!settings.navigation_enabled) {
+    return {};
+  }
+  return " source." + Queue() + "videorate drop-only=true max-rate=" +
+         std::to_string(settings.navigation.fps) +
+         " ! video/x-raw(ANY),framerate=" +
+         std::to_string(settings.navigation.fps) + "/1 ! " +
+         Convert(settings, settings.navigation, "GRAY8") +
+         " ! appsink name=navigation max-buffers=1 drop=true sync=false "
+         "async=false wait-on-eos=false";
 }
 
 std::string VideoGraph(const Settings& settings,
@@ -165,9 +192,10 @@ std::string BuildPipeline(const Settings& settings,
   return SourceGraph(settings) +
          " ! tee name=source "
          "source." +
-         Queue() + "videorate drop-only=true ! video/x-raw(ANY),framerate=" +
-         std::to_string(settings.image.fps) + "/1 ! " +
-         Convert(settings, settings.image, "RGB") +
+         Queue() + "videorate drop-only=true max-rate=" +
+         std::to_string(settings.image.fps) +
+         " ! video/x-raw(ANY),framerate=" + std::to_string(settings.image.fps) +
+         "/1 ! " + Convert(settings, settings.image, "RGB") +
          " ! appsink name=frames max-buffers=1 drop=true sync=false "
          "async=false "
          "wait-on-eos=false source." +
@@ -177,6 +205,6 @@ std::string BuildPipeline(const Settings& settings,
          " ! appsink name=photos max-buffers=1 drop=true sync=false "
          "async=false "
          "wait-on-eos=false" +
-         VideoGraph(settings, recording_id);
+         NavigationGraph(settings) + VideoGraph(settings, recording_id);
 }
 }  // namespace raven::media

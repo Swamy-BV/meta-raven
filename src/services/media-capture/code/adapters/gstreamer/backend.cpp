@@ -122,13 +122,18 @@ void Timestamp(raven::contracts::CameraFrame& frame, GstBuffer* buffer,
 raven::contracts::CameraFrame Pixels(GstSample* sample, GstElement* pipeline) {
   GstVideoInfo info{};
   if (!gst_video_info_from_caps(&info, gst_sample_get_caps(sample)) ||
-      GST_VIDEO_INFO_FORMAT(&info) != GST_VIDEO_FORMAT_RGB) {
-    throw std::runtime_error("expected RGB8 frame");
+      (GST_VIDEO_INFO_FORMAT(&info) != GST_VIDEO_FORMAT_RGB &&
+       GST_VIDEO_INFO_FORMAT(&info) != GST_VIDEO_FORMAT_GRAY8)) {
+    throw std::runtime_error("expected RGB8 or mono8 frame");
   }
   raven::contracts::CameraFrame frame;
   frame.width = GST_VIDEO_INFO_WIDTH(&info);
   frame.height = GST_VIDEO_INFO_HEIGHT(&info);
-  const auto row = static_cast<std::size_t>(frame.width) * kChannels;
+  const bool mono = GST_VIDEO_INFO_FORMAT(&info) == GST_VIDEO_FORMAT_GRAY8;
+  frame.pixel_format = mono ? raven::contracts::PixelFormat::kMono8
+                            : raven::contracts::PixelFormat::kRgb8;
+  const auto row =
+      static_cast<std::size_t>(frame.width) * (mono ? 1 : kChannels);
   if (frame.width <= 0 || frame.height <= 0 ||
       row * static_cast<std::size_t>(frame.height) > kMaxFrameBytes) {
     throw std::runtime_error("camera frame exceeds bounds");
@@ -154,6 +159,18 @@ raven::contracts::CameraFrame Pixels(GstSample* sample, GstElement* pipeline) {
   return frame;
 }
 
+const char* InputFormat(raven::contracts::PixelFormat format) {
+  switch (format) {
+    case raven::contracts::PixelFormat::kRgb8:
+      return "RGB";
+    case raven::contracts::PixelFormat::kBgr8:
+      return "BGR";
+    case raven::contracts::PixelFormat::kMono8:
+      return "GRAY8";
+  }
+  throw std::invalid_argument("unsupported input pixel format");
+}
+
 void Gate(GstElement* gate, bool closed) {
   if (gate) {
     g_object_set(gate, "drop", static_cast<gboolean>(closed), nullptr);
@@ -174,6 +191,7 @@ class GstreamerBackend::Impl {
   GstElement* pipeline = nullptr;
   GstElement* photos = nullptr;
   GstElement* frames = nullptr;
+  GstElement* navigation = nullptr;
   GstElement* photo_gate = nullptr;
   GstElement* stream_gate = nullptr;
   GstElement* input = nullptr;
@@ -200,7 +218,7 @@ class GstreamerBackend::Impl {
   void Clear() {
     stream_origin.reset();
     for (auto** element :
-         {&photos, &frames, &photo_gate, &stream_gate, &input}) {
+         {&photos, &frames, &navigation, &photo_gate, &stream_gate, &input}) {
       if (*element) {
         gst_object_unref(*element);
         *element = nullptr;
@@ -277,6 +295,7 @@ void GstreamerBackend::Start(const Settings& settings,
   }
   impl_->photos = Element(impl_->pipeline, "photos");
   impl_->frames = Element(impl_->pipeline, "frames");
+  impl_->navigation = Element(impl_->pipeline, "navigation");
   impl_->photo_gate = Element(impl_->pipeline, "photo_gate");
   impl_->stream_gate = Element(impl_->pipeline, "stream_gate");
   impl_->input = Element(impl_->pipeline, "ros_input");
@@ -373,6 +392,11 @@ std::optional<raven::contracts::CameraFrame> GstreamerBackend::TakeFrame() {
   return impl_->Take(impl_->frames);
 }
 
+std::optional<raven::contracts::CameraFrame>
+GstreamerBackend::TakeNavigation() {
+  return impl_->Take(impl_->navigation);
+}
+
 void GstreamerBackend::PushFrame(const raven::contracts::CameraFrame& frame) {
   if (!impl_->input) {
     return;
@@ -380,9 +404,9 @@ void GstreamerBackend::PushFrame(const raven::contracts::CameraFrame& frame) {
   // GLib's public fundamental-type macros shift signed literals.
   // NOLINTBEGIN(hicpp-signed-bitwise)
   GstCaps* caps = gst_caps_new_simple(
-      "video/x-raw", "format", G_TYPE_STRING, "RGB", "width", G_TYPE_INT,
-      frame.width, "height", G_TYPE_INT, frame.height, "framerate",
-      GST_TYPE_FRACTION, impl_->settings.image.fps, 1, nullptr);
+      "video/x-raw", "format", G_TYPE_STRING, InputFormat(frame.pixel_format),
+      "width", G_TYPE_INT, frame.width, "height", G_TYPE_INT, frame.height,
+      "framerate", GST_TYPE_FRACTION, 0, 1, nullptr);
   // NOLINTEND(hicpp-signed-bitwise)
   // This element is always the graph's GstAppSrc.
   // NOLINTNEXTLINE(bugprone-casting-through-void)

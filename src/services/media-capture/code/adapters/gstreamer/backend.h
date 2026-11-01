@@ -26,6 +26,8 @@ class GstreamerBackend final : public CaptureBackend {
       override;
   [[nodiscard]] std::optional<raven::contracts::CameraFrame> TakeFrame()
       override;
+  [[nodiscard]] std::optional<raven::contracts::CameraFrame> TakeNavigation()
+      override;
   void PushFrame(const raven::contracts::CameraFrame& frame) override;
   void SetControls(const Controls& controls) override;
   [[nodiscard]] std::vector<std::string> ControlNames() const override;

@@ -90,6 +90,9 @@ Settings MediaCaptureNode::ReadSettings() {
   ReadProfile(*this, settings.preview);
   ReadProfile(*this, settings.video);
   ReadProfile(*this, settings.image);
+  ReadProfile(*this, settings.navigation);
+  settings.navigation_enabled =
+      Parameter(*this, "navigation_enabled", settings.navigation_enabled);
   Validate(settings);
   return settings;
 }

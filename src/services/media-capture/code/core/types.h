@@ -10,6 +10,7 @@ constexpr auto kExposureTimeUs = 10000;
 constexpr auto kPhotoHeight = 1080;
 constexpr auto kVideoWidth = 1280;
 constexpr auto kFrameRate = 15;
+constexpr auto kNavigationFrameRate = 20;
 constexpr auto kPhotoWidth = 1920;
 constexpr auto kVideoBitrateKbps = 2000;
 constexpr auto kImageHeight = 360;
@@ -60,6 +61,10 @@ struct Settings {
                 "h264",  kVideoBitrateKbps, kJpegQuality};
   Profile image{"ros",  kImageWidth,       kImageHeight, kFrameRate,
                 "rgb8", kVideoBitrateKbps, kJpegQuality};
+  Profile navigation{"navigation",         kImageWidth, kImageHeight,
+                     kNavigationFrameRate, "mono8",     kVideoBitrateKbps,
+                     kJpegQuality};
+  bool navigation_enabled = false;
   std::string mode = "video";
   std::string converter = "software";
   std::string output_dir = "media";

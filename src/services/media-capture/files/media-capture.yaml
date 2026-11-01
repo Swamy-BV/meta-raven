@@ -22,6 +22,12 @@
     ros_width: 640
     ros_height: 360
     ros_fps: 15
+    # Optional navigation image output; no estimator is started.
+    navigation_enabled: false
+    navigation_width: 640
+    navigation_height: 360
+    navigation_fps: 20
+    navigation_image_topic: /navigation/camera/image_raw
     streaming: false
     recording: false
     output_dir: .

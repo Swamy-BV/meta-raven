@@ -92,6 +92,13 @@ MediaCaptureNode::MediaCaptureNode(std::unique_ptr<CaptureBackend> backend,
   auto qos = rmw_qos_profile_sensor_data;
   qos.depth = 1;
   images_ = image_transport::create_camera_publisher(this, "image_raw", qos);
+  const auto navigation_topic = declare_parameter<std::string>(
+      "navigation_image_topic", "navigation/image_raw");
+  navigation_ =
+      image_transport::create_camera_publisher(this, navigation_topic, qos);
+  if (navigation_.getTopic() == images_.getTopic()) {
+    throw std::invalid_argument("colour and navigation outputs must differ");
+  }
   const auto state_qos = rclcpp::QoS(1).reliable().transient_local();
   state_ =
       create_publisher<raven_interfaces::msg::MediaState>("state", state_qos);
@@ -175,7 +182,7 @@ void MediaCaptureNode::ChangeSource(
   if (source.kind == "ros") {
     const auto expanded = rclcpp::expand_topic_or_service_name(
         source.image_topic, get_name(), get_namespace(), false);
-    if (expanded == images_.getTopic()) {
+    if (expanded == images_.getTopic() || expanded == navigation_.getTopic()) {
       throw std::invalid_argument(
           "ROS input cannot subscribe to its own output");
     }
@@ -224,13 +231,15 @@ void MediaCaptureNode::ConfigureInput() {
   input_.reset();
   input_info_.reset();
   calibration_ = sensor_msgs::msg::CameraInfo{};
+  input_width_ = 0;
+  input_height_ = 0;
   const auto& source = session_->Configuration().source;
   if (source.kind != "ros") {
     return;
   }
   const auto expanded = rclcpp::expand_topic_or_service_name(
       source.image_topic, get_name(), get_namespace(), false);
-  if (expanded == images_.getTopic()) {
+  if (expanded == images_.getTopic() || expanded == navigation_.getTopic()) {
     throw std::invalid_argument("ROS input topic loops back to camera output");
   }
   input_ = create_subscription<sensor_msgs::msg::Image>(
@@ -256,17 +265,27 @@ void MediaCaptureNode::ReceiveImage(const sensor_msgs::msg::Image& image) {
 }
 
 void MediaCaptureNode::InputFrame(const sensor_msgs::msg::Image& image) {
-  if (image.encoding != "rgb8" || image.width == 0 || image.height == 0 ||
-      image.width > kMaxWidth || image.height > kMaxHeight ||
-      image.data.size() > kMaxInputBytes ||
-      image.step < image.width * kChannels ||
+  const bool mono = image.encoding == "mono8";
+  const auto channels = mono ? 1U : kChannels;
+  if ((!mono && image.encoding != "rgb8" && image.encoding != "bgr8") ||
+      image.width == 0 || image.height == 0 || image.width > kMaxWidth ||
+      image.height > kMaxHeight || image.data.size() > kMaxInputBytes ||
+      image.step < image.width * channels ||
       image.data.size() !=
           static_cast<std::size_t>(image.step) * image.height ||
-      image.header.stamp.sec < 0) {
+      image.header.stamp.sec < 0 ||
+      image.header.stamp.nanosec >= kNanosPerSecond) {
     throw std::invalid_argument(
-        "ROS source requires bounded RGB8 images with valid timestamps");
+        "ROS source requires bounded RGB8/BGR8/mono8 images with valid "
+        "timestamps");
   }
   raven::contracts::CameraFrame frame;
+  frame.pixel_format = mono ? raven::contracts::PixelFormat::kMono8
+                       : image.encoding == "bgr8"
+                           ? raven::contracts::PixelFormat::kBgr8
+                           : raven::contracts::PixelFormat::kRgb8;
+  input_width_ = image.width;
+  input_height_ = image.height;
   frame.width = static_cast<int>(image.width);
   frame.height = static_cast<int>(image.height);
   frame.captured_unix_us =
@@ -276,7 +295,7 @@ void MediaCaptureNode::InputFrame(const sensor_msgs::msg::Image& image) {
       static_cast<std::uint64_t>(image.header.stamp.sec) * kNanosPerSecond +
       image.header.stamp.nanosec;
   frame.optical_frame = image.header.frame_id;
-  const auto row = static_cast<std::size_t>(image.width) * kChannels;
+  const auto row = static_cast<std::size_t>(image.width) * channels;
   frame.data.resize(row * image.height);
   for (std::uint32_t y = 0; y < image.height; ++y) {
     std::memcpy(frame.data.data() + y * row,
@@ -286,7 +305,9 @@ void MediaCaptureNode::InputFrame(const sensor_msgs::msg::Image& image) {
   backend_->PushFrame(frame);
 }
 
-void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
+void MediaCaptureNode::PublishFrame(
+    raven::contracts::CameraFrame frame,
+    const image_transport::CameraPublisher& publisher) {
   sensor_msgs::msg::Image image;
   image.header = Header(
       {{},
@@ -302,30 +323,13 @@ void MediaCaptureNode::PublishFrame(raven::contracts::CameraFrame frame) {
   }
   image.width = frame.width;
   image.height = frame.height;
-  image.encoding = "rgb8";
-  image.step = image.width * kChannels;
+  const bool mono = frame.pixel_format == raven::contracts::PixelFormat::kMono8;
+  image.encoding = mono ? "mono8" : "rgb8";
+  image.step = image.width * (mono ? 1U : kChannels);
   image.data = std::move(frame.data);
-  sensor_msgs::msg::CameraInfo info;
-  info.header = image.header;
-  info.width = image.width;
-  info.height = image.height;
-  // Configured calibration applies only at its original resolution.
-  if (configured_calibration_valid_ && camera_info_->isCalibrated()) {
-    const auto configured = camera_info_->getCameraInfo();
-    if (configured.width == image.width && configured.height == image.height) {
-      info = configured;
-      info.header = image.header;
-    }
-  }
-  // Unknown or differently sized calibration is never invented.
-  if (calibration_.header.frame_id == image.header.frame_id &&
-      calibration_.width == image.width &&
-      calibration_.height == image.height) {
-    info = calibration_;
-    info.header = image.header;
-  }
+  const auto info = CalibrationFor(image);
   TraceFrame(rclcpp::Time(image.header.stamp).nanoseconds());
-  images_.publish(image, info);
+  publisher.publish(image, info);
 }
 
 // This single ROS logging macro expands to many generated control statements.
@@ -383,11 +387,15 @@ void MediaCaptureNode::PublishPhoto(const Photo& photo) {
 }
 
 void MediaCaptureNode::PublishNextFrame() {
-  if (images_.getNumSubscribers() == 0) {
-    return;
+  if (images_.getNumSubscribers() > 0) {
+    if (auto frame = backend_->TakeFrame()) {
+      PublishFrame(std::move(*frame), images_);
+    }
   }
-  if (auto frame = backend_->TakeFrame()) {
-    PublishFrame(std::move(*frame));
+  if (navigation_.getNumSubscribers() > 0) {
+    if (auto frame = backend_->TakeNavigation()) {
+      PublishFrame(std::move(*frame), navigation_);
+    }
   }
 }
 
@@ -434,8 +442,8 @@ void MediaCaptureNode::PublishState() {
   message.error = state.error;
   message.free_bytes = session_->FreeBytes();
   message.total_bytes = store_->TotalBytes();
-  for (const auto* profile :
-       {&config.photo, &config.preview, &config.video, &config.image}) {
+  for (const auto* profile : {&config.photo, &config.preview, &config.video,
+                              &config.image, &config.navigation}) {
     message.profiles.push_back(ToMessage(*profile));
   }
   state_->publish(message);
@@ -470,7 +478,9 @@ void MediaCaptureNode::PublishCapabilities() {
   message.limitations = {
       "Recording and streaming share one encoder and require matching profiles",
       "Profile/source/mode changes require stopped recording",
-      "ROS input accepts RGB8; other pixel formats are rejected",
+      "ROS input accepts RGB8, BGR8 and mono8",
+      "Navigation mono8 output is enabled by navigation_enabled at startup",
+      "Unknown camera geometry publishes uncalibrated CameraInfo",
       "Network input accepts H.264 RTP/UDP with payload type 96",
       "Video file replay accepts H.264 video through the hardware decoder",
       "Exposure and white balance controls require a native control adapter",

@@ -11,6 +11,7 @@
 namespace raven::media {
 // All calls are serialized on the application thread. The backend owns its
 // pipeline and retained hardware buffers; returned frames own copied pixels.
+// Photo/colour outputs are RGB8; the navigation output is mono8.
 class CaptureBackend {
  public:
   CaptureBackend() = default;
@@ -30,6 +31,8 @@ class CaptureBackend {
   TakePhoto() = 0;
   [[nodiscard]] virtual std::optional<raven::contracts::CameraFrame>
   TakeFrame() = 0;
+  [[nodiscard]] virtual std::optional<raven::contracts::CameraFrame>
+  TakeNavigation() = 0;
   virtual void PushFrame(const raven::contracts::CameraFrame& frame) = 0;
   virtual void SetControls(const Controls& controls) = 0;
   [[nodiscard]] virtual std::vector<std::string> ControlNames() const = 0;

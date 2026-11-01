@@ -9,10 +9,14 @@
 namespace raven::contracts {
 inline constexpr std::size_t kMaxCameraBytes = 8ULL * 1024 * 1024;
 
-// Packed RGB8 pixels. Unix and monotonic timestamps are in microseconds.
-// PTS is optional; standard ROS Image transports do not carry source PTS.
+enum class PixelFormat { kRgb8, kBgr8, kMono8 };
+
+// Packed pixels in pixel_format. Unix and monotonic timestamps are in
+// microseconds. PTS is optional; standard ROS Image transports do not carry
+// source PTS.
 struct CameraFrame {
   std::vector<std::uint8_t> data;
+  PixelFormat pixel_format = PixelFormat::kRgb8;
   std::uint64_t sequence = 0, captured_us = 0, pts_ns = 0;
   std::uint64_t captured_unix_us = 0;
   // Original ROS clock stamp, when supplied by a ROS image source. Retain

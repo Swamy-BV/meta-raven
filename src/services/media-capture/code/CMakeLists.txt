@@ -37,7 +37,8 @@ add_executable(
   adapters/gstreamer/rtp_origin.cpp
   adapters/storage/photo_store.cpp
   adapters/ros/node.cpp
-  adapters/ros/settings.cpp)
+  adapters/ros/settings.cpp
+  adapters/ros/calibration.cpp)
 target_link_libraries(media-capture PkgConfig::GSTREAMER Raven::platform-contracts)
 target_include_directories(media-capture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 ament_target_dependencies(

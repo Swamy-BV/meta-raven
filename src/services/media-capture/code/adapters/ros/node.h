@@ -57,7 +57,10 @@ class MediaCaptureNode final : public rclcpp::Node {
   void ChangeSource(
       const raven_interfaces::srv::SetMediaSource::Request& request);
   void PublishNextFrame();
-  void PublishFrame(raven::contracts::CameraFrame frame);
+  void PublishFrame(raven::contracts::CameraFrame frame,
+                    const image_transport::CameraPublisher& publisher);
+  [[nodiscard]] sensor_msgs::msg::CameraInfo CalibrationFor(
+      const sensor_msgs::msg::Image& image) const;
   void PublishState();
   void PublishCapabilities();
   void PublishPhoto(const Photo& photo);
@@ -69,6 +72,7 @@ class MediaCaptureNode final : public rclcpp::Node {
   std::unique_ptr<MediaStore> store_;
   std::unique_ptr<Session> session_;
   image_transport::CameraPublisher images_;
+  image_transport::CameraPublisher navigation_;
   rclcpp::Publisher<raven_interfaces::msg::MediaState>::SharedPtr state_;
   rclcpp::Publisher<raven_interfaces::msg::MediaCapabilities>::SharedPtr
       capabilities_;
@@ -78,6 +82,8 @@ class MediaCaptureNode final : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr input_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr input_info_;
   sensor_msgs::msg::CameraInfo calibration_;
+  std::uint32_t input_width_ = 0;
+  std::uint32_t input_height_ = 0;
   std::unique_ptr<camera_info_manager::CameraInfoManager> camera_info_;
   bool configured_calibration_valid_ = true;
   rclcpp::Service<raven_interfaces::srv::SetMediaProfile>::SharedPtr profile_;

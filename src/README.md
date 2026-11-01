@@ -74,7 +74,8 @@ Their intended boundaries are shown below; they are not enabled capabilities.
 
 ```mermaid
 flowchart TD
-    vio[visual-odometry] --> adapter[px4-odometry]
+    capture[media-capture] -->|Optional mono8 images and CameraInfo| vio[visual-odometry]
+    vio --> adapter[px4-odometry]
     adapter -->|External measurements through DDS| px4[M7 PX4 EKF2]
     px4 -->|Fused aircraft pose| frames[navigation-frames]
     vio -->|Acquisition-time alignment check| frames

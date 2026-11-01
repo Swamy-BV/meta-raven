@@ -60,8 +60,8 @@ void ValidateSource(const Source& source) {
 }  // namespace
 
 Profile& SelectProfile(Settings& settings, const std::string& purpose) {
-  for (auto* profile :
-       {&settings.photo, &settings.preview, &settings.video, &settings.image}) {
+  for (auto* profile : {&settings.photo, &settings.preview, &settings.video,
+                        &settings.image, &settings.navigation}) {
     if (profile->purpose == purpose) {
       return *profile;
     }
@@ -78,14 +78,17 @@ bool SameVideoFormat(const Profile& left, const Profile& right) {
 void Validate(const Settings& settings) {
   ValidateSource(settings.source);
   for (const auto* profile :
-       {&settings.photo, &settings.preview, &settings.video, &settings.image}) {
+       {&settings.photo, &settings.preview, &settings.video, &settings.image,
+        &settings.navigation}) {
     ValidateProfile(*profile);
   }
   if (settings.photo.codec != "jpeg" || settings.image.codec != "rgb8" ||
+      settings.navigation.codec != "mono8" ||
       (settings.preview.codec != "h264" && settings.preview.codec != "h265") ||
       (settings.video.codec != "h264" && settings.video.codec != "h265")) {
     throw std::invalid_argument(
-        "supported profiles are JPEG photos, RGB8 ROS and H.264/H.265 video");
+        "supported profiles are JPEG photos, RGB8/mono8 ROS and H.264/H.265 "
+        "video");
   }
   if ((settings.mode != "photo" && settings.mode != "video") ||
       (settings.converter != "g2d" && settings.converter != "software") ||
