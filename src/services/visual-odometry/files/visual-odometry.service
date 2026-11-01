@@ -10,6 +10,7 @@ DynamicUser=yes
 StateDirectory=visual-odometry
 LogsDirectory=visual-odometry
 Environment=ROS_LOG_DIR=/var/log/visual-odometry
+Environment=ROS_HOME=/var/lib/visual-odometry
 Environment=AMENT_PREFIX_PATH=@ROS_PREFIX@
 Environment=LD_LIBRARY_PATH=@ROS_PREFIX@/lib
 Environment=OMP_NUM_THREADS=2

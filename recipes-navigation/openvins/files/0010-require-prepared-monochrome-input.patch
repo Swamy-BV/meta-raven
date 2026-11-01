@@ -1,0 +1,68 @@
+From: Raven Contributors <raven@localhost>
+Subject: [PATCH] Allow camera consumers to require prepared mono8 input
+
+Make implicit cv_bridge colour conversion optional. Raven's media-capture
+node prepares navigation images; reject incorrect encodings before modifying
+camera tracking state when require_mono8 is enabled. The default remains
+compatible with upstream colour subscriptions. Keep the existing owned queue
+copy, acquisition timestamps and estimator equations unchanged.
+
+Upstream-Status: Pending
+Signed-off-by: Raven Contributors <raven@localhost>
+
+--- a/ov_msckf/src/ros/ROS2Visualizer.h
++++ b/ov_msckf/src/ros/ROS2Visualizer.h
+@@ -125,6 +125,10 @@
+                        int cam_id1);
+ 
+ protected:
++  /// Reject unexpected colour inputs when the navigation pipeline owns conversion.
++  bool accepts_image(const sensor_msgs::msg::Image& image) const;
++  bool require_mono8 = false;
++
+   /// Publish the current state
+   void publish_state();
+ 
+--- a/ov_msckf/src/ros/ROS2Visualizer.cpp
++++ b/ov_msckf/src/ros/ROS2Visualizer.cpp
+@@ -175,6 +175,8 @@
+ 
+   // We need a valid parser
+   assert(parser != nullptr);
++
++  _node->get_parameter_or("require_mono8", require_mono8, false);
+ 
+   // Create imu subscriber (handle legacy ros param info)
+   std::string topic_imu;
+@@ -516,7 +518,20 @@
+   }
+ }
+ 
++bool ROS2Visualizer::accepts_image(const sensor_msgs::msg::Image& image) const {
++  if (!require_mono8 || image.encoding == sensor_msgs::image_encodings::MONO8) {
++    return true;
++  }
++  RCLCPP_WARN_THROTTLE(_node->get_logger(), *_node->get_clock(), 5000,
++                      "Navigation camera requires mono8; received %s", image.encoding.c_str());
++  return false;
++}
++
+ void ROS2Visualizer::callback_monocular(const sensor_msgs::msg::Image::SharedPtr msg0, int cam_id0) {
++
++  if (!accepts_image(*msg0)) {
++    return;
++  }
+ 
+   // Check if we should drop this image
+   double timestamp = msg0->header.stamp.sec + msg0->header.stamp.nanosec * 1e-9;
+@@ -557,6 +572,10 @@
+ 
+ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedPtr msg0, const sensor_msgs::msg::Image::ConstSharedPtr msg1,
+                                      int cam_id0, int cam_id1) {
++
++  if (!accepts_image(*msg0) || !accepts_image(*msg1)) {
++    return;
++  }
+ 
+   // Check if we should drop this image
+   double timestamp = msg0->header.stamp.sec + msg0->header.stamp.nanosec * 1e-9;

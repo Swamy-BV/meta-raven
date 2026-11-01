@@ -86,6 +86,7 @@ class MediaCaptureNode final : public rclcpp::Node {
   std::uint32_t input_height_ = 0;
   std::unique_ptr<camera_info_manager::CameraInfoManager> camera_info_;
   bool configured_calibration_valid_ = true;
+  bool configured_ros_calibration_ = false;
   rclcpp::Service<raven_interfaces::srv::SetMediaProfile>::SharedPtr profile_;
   rclcpp::Service<raven_interfaces::srv::SetMediaSource>::SharedPtr source_;
   rclcpp::Service<raven_interfaces::srv::SetMediaMode>::SharedPtr mode_;

@@ -29,6 +29,7 @@ SRC_URI += "\
     file://0007-own-workers-and-ros-shutdown.patch;patchdir=.. \
     file://0008-bound-optional-visualization.patch;patchdir=.. \
     file://0009-publish-stationary-initialized-odometry.patch;patchdir=.. \
+    file://0010-require-prepared-monochrome-input.patch;patchdir=.. \
 "
 
 # Keep the feature-level simulator out of the normal runtime installation.

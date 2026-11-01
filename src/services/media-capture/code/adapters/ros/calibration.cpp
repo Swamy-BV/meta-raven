@@ -35,6 +35,15 @@ bool ValidCalibration(const sensor_msgs::msg::CameraInfo& info) {
          info.roi.y_offset == 0 && info.roi.width == 0 && info.roi.height == 0;
 }
 
+bool MatchesImageIdentity(const sensor_msgs::msg::CameraInfo& info,
+                          const sensor_msgs::msg::Image& image) {
+  return info.header.stamp.sec >= 0 &&
+         info.header.stamp.nanosec < kNanosecondsPerSecond &&
+         info.header.frame_id == image.header.frame_id &&
+         rclcpp::Time(info.header.stamp).nanoseconds() <=
+             rclcpp::Time(image.header.stamp).nanoseconds();
+}
+
 sensor_msgs::msg::CameraInfo ResizeCalibration(
     sensor_msgs::msg::CameraInfo info, const sensor_msgs::msg::Image& image) {
   // The pipeline stretches the complete input image. Distortion coefficients
@@ -68,18 +77,22 @@ sensor_msgs::msg::CameraInfo MediaCaptureNode::CalibrationFor(
   auto calibration = calibration_;
   auto source_width = input_width_;
   auto source_height = input_height_;
-  if (source.kind != "ros") {
+  const bool missing_input_info =
+      calibration.width == 0 && calibration.height == 0;
+  if (source.kind != "ros" ||
+      (missing_input_info && configured_ros_calibration_)) {
     if (!configured_calibration_valid_ || !camera_info_->isCalibrated()) {
       return unknown;
     }
     calibration = camera_info_->getCameraInfo();
-    source_width = static_cast<std::uint32_t>(source.width);
-    source_height = static_cast<std::uint32_t>(source.height);
-  } else if (calibration.header.stamp.sec < 0 ||
-             calibration.header.stamp.nanosec >= kNanosecondsPerSecond ||
-             calibration.header.frame_id != image.header.frame_id ||
-             rclcpp::Time(calibration.header.stamp).nanoseconds() >
-                 rclcpp::Time(image.header.stamp).nanoseconds()) {
+    // An explicit calibration URL may describe a ROS source whose driver
+    // publishes CameraInfo only at startup. Never reuse it after source
+    // changes.
+    if (source.kind != "ros") {
+      source_width = static_cast<std::uint32_t>(source.width);
+      source_height = static_cast<std::uint32_t>(source.height);
+    }
+  } else if (!MatchesImageIdentity(calibration, image)) {
     return unknown;
   }
   const bool same_resolution =

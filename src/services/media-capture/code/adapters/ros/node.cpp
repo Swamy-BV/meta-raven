@@ -86,6 +86,7 @@ MediaCaptureNode::MediaCaptureNode(std::unique_ptr<CaptureBackend> backend,
       !camera_info_->loadCameraInfo(calibration_url)) {
     throw std::invalid_argument("Unable to load camera_info_url");
   }
+  configured_ros_calibration_ = !calibration_url.empty();
   const auto settings = ReadSettings();
   store_ = store(settings);
   session_ = std::make_unique<Session>(settings, *backend_, *store_);
