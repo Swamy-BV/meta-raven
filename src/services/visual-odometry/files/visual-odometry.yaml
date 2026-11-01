@@ -8,6 +8,10 @@
     save_total_state: false
     # media-capture owns colour conversion; reject accidental colour input.
     require_mono8: true
+    # Slow flight can resemble rest; never apply stationary updates after motion.
+    zupt_only_at_beginning: true
+    # Small image disparity must not override inertial evidence of motion.
+    zupt_max_disparity: 0.0
     max_cameras: 1
     use_stereo: false
     path_gt: ""
