@@ -10,7 +10,10 @@ DEPENDS = "\
 "
 require openvins.inc
 
-SRC_URI += "file://0011-add-monocular-opencl-klt.patch;patchdir=.."
+SRC_URI += "\
+    file://0011-add-monocular-opencl-klt.patch;patchdir=.. \
+    file://0015-handle-zero-flow-klt-geometry.patch;patchdir=.. \
+"
 
 RDEPENDS:${PN} += "\
     cv-bridge \
